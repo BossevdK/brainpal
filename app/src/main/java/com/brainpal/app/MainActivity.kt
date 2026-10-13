@@ -744,6 +744,24 @@ fun ConsentView(item: Item, done: () -> Unit) {
     }
 }
 
+/** Heeft het plaatje een effen, ondoorzichtige rand (logo op wit)? Dan die kleur; anders null. */
+private fun edgeColor(d: android.graphics.drawable.Drawable): Color? {
+    val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return null
+    if (bmp.config == android.graphics.Bitmap.Config.HARDWARE) return null
+    val w = bmp.width; val h = bmp.height
+    if (w < 4 || h < 4) return null
+    val px = ArrayList<Int>()
+    for (i in 0..11) {
+        val x = (w - 1) * i / 11; val y = (h - 1) * i / 11
+        px += bmp.getPixel(x, 0); px += bmp.getPixel(x, h - 1); px += bmp.getPixel(0, y); px += bmp.getPixel(w - 1, y)
+    }
+    fun ch(c: Int, shift: Int) = (c shr shift) and 0xFF
+    if (px.any { ch(it, 24) < 250 }) return null // doorzichtig
+    val ref = px[0]
+    val uniform = px.all { p -> listOf(16, 8, 0).all { s -> kotlin.math.abs(ch(p, s) - ch(ref, s)) <= 20 } }
+    return if (uniform) Color(ref) else null
+}
+
 /** Plaatje bij een bericht. Stuurt de pagina mee als herkomst (sommige sites blokkeren anders) en verdwijnt als laden mislukt. */
 @Composable
 fun NewsImage(url: String, pageUrl: String, modifier: Modifier) {
@@ -752,24 +770,31 @@ fun NewsImage(url: String, pageUrl: String, modifier: Modifier) {
     val ctx = LocalContext.current
     val request = remember(url, pageUrl) {
         ImageRequest.Builder(ctx).data(url)
+            .allowHardware(false) // nodig om de randkleur van het plaatje uit te lezen
             .addHeader("Referer", pageUrl)
             .addHeader("User-Agent", Net.BROWSER_UA)
             .build()
     }
     // Brede plaatjes vullen het vak (bijsnijden). Vierkante en staande plaatjes tonen we heel, met een vervaagde kopie erachter, zodat er niets afgesneden of ingezoomd wordt.
     var ratio by remember(url) { mutableStateOf<Float?>(null) }
+    var edge by remember(url) { mutableStateOf<Color?>(null) } // effen randkleur (bijvoorbeeld een logo op wit)
     val wide = ratio.let { it == null || it in 1.4f..2.4f }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        if (!wide) AsyncImage(
-            model = request, contentDescription = null, contentScale = ContentScale.Crop,
-            modifier = Modifier.matchParentSize().blur(28.dp).alpha(0.7f)
-        )
+        if (!wide) {
+            // Effen rand: dezelfde kleur erachter, zodat het plaatje naadloos overgaat. Anders een vervaagde kopie.
+            if (edge != null) Box(Modifier.matchParentSize().background(edge!!))
+            else AsyncImage(
+                model = request, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().blur(28.dp).alpha(0.7f)
+            )
+        }
         AsyncImage(
             model = request, contentDescription = null, contentScale = if (wide) ContentScale.Crop else ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
             onSuccess = { st ->
                 val d = st.result.drawable
                 if (d.intrinsicWidth > 0 && d.intrinsicHeight > 0) ratio = d.intrinsicWidth.toFloat() / d.intrinsicHeight
+                edge = runCatching { edgeColor(d) }.getOrNull()
             },
             onError = { failed = true }
         )
