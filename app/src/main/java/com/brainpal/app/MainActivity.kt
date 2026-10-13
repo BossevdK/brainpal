@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val vm = vm // `by viewModels()` is lazy: hier afdwingen, anders ontstaat de Vm alsnog binnen setContent
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(
