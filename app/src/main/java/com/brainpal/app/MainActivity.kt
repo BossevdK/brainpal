@@ -79,6 +79,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -754,9 +756,22 @@ fun NewsImage(url: String, pageUrl: String, modifier: Modifier) {
             .addHeader("User-Agent", Net.BROWSER_UA)
             .build()
     }
-    AsyncImage(
-        model = request, contentDescription = null, contentScale = ContentScale.Crop,
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-        onError = { failed = true }
-    )
+    // Brede plaatjes vullen het vak (bijsnijden). Vierkante en staande plaatjes tonen we heel, met een vervaagde kopie erachter, zodat er niets afgesneden of ingezoomd wordt.
+    var ratio by remember(url) { mutableStateOf<Float?>(null) }
+    val wide = ratio.let { it == null || it in 1.4f..2.4f }
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+        if (!wide) AsyncImage(
+            model = request, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize().blur(28.dp).alpha(0.7f)
+        )
+        AsyncImage(
+            model = request, contentDescription = null, contentScale = if (wide) ContentScale.Crop else ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+            onSuccess = { st ->
+                val d = st.result.drawable
+                if (d.intrinsicWidth > 0 && d.intrinsicHeight > 0) ratio = d.intrinsicWidth.toFloat() / d.intrinsicHeight
+            },
+            onError = { failed = true }
+        )
+    }
 }
