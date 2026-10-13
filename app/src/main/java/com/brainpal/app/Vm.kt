@@ -127,7 +127,22 @@ class Vm(app: Application) : AndroidViewModel(app) {
         o.getString("i").ifEmpty { null }, o.getString("p")
     )
 
+    private var persistJob: kotlinx.coroutines.Job? = null
+    private var persistPending = false
+
+    /** Bundelt snel opeenvolgende wijzigingen (duimpjes, gelezen) tot één keer opslaan, in plaats van elke keer alles opnieuw. */
     private fun persist() {
+        persistPending = true
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch { kotlinx.coroutines.delay(500); persistNow() }
+    }
+
+    /** Slaat meteen op als er iets te bewaren is; aangeroepen als de app naar de achtergrond gaat. */
+    fun flush() { if (persistPending) persistNow() }
+
+    private fun persistNow() {
+        persistPending = false
+        persistJob?.cancel()
         val v = JSONObject(); val m = JSONObject()
         for ((k, x) in votes) {
             v.put(k, x)
@@ -143,7 +158,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
         topics = t
         items = items.filter { it.topic in t }
         if (filter != null && filter !in t) filter = null
-        persist()
+        persistNow()
         if (loading) refreshAgain = true else refresh() // loopt er al een vernieuwing, dan start de volgende zodra die klaar is
     }
 
@@ -163,7 +178,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
     /** Zet een bron aan of uit. Uit: de berichten verdwijnen meteen. Aan: alleen dat onderwerp wordt (even later) opnieuw opgehaald. */
     fun setSource(t: Topic, s: Source, on: Boolean) {
         sourceOverride["${t.id}/${s.name}"] = on
-        persist()
+        persistNow()
         if (!on) {
             items = items.filter { !(it.topic == t.id && it.source == s.name) }
         } else {

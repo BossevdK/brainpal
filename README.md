@@ -17,7 +17,7 @@ Android vraagt eenmalig toestemming om apps van buiten de Play Store te installe
 ## Een nieuwe versie uitbrengen
 
 1. Verhoog `versionCode` en `versionName` in `app/build.gradle.kts`.
-2. Bouw: `gradle assembleRelease` (de sleutel staat in `keystore.properties`, dat staat niet in git).
+2. Bouw: `gradlew assembleRelease` (de Gradle-wrapper zit in de repo) (de sleutel staat in `keystore.properties`, dat staat niet in git).
 3. Maak een release met een tag die gelijk is aan het versienummer, met het apk-bestand erbij:
 
    ```

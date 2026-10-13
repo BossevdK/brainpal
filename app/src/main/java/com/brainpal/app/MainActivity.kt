@@ -173,7 +173,7 @@ fun App(vm: Vm) {
     // Vernieuw als je terugkomt in de app (alleen als de feed ouder is dan 10 minuten).
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) vm.refreshIfStale() }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) vm.refreshIfStale() else if (event == Lifecycle.Event.ON_PAUSE) vm.flush() }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
