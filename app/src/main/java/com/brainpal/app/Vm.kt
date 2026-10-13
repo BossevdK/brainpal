@@ -229,11 +229,21 @@ class Vm(app: Application) : AndroidViewModel(app) {
                 if (only == null) updated = System.currentTimeMillis()
                 val snapshot = items
                 launch(Dispatchers.IO) { saveCache(snapshot) }
+                prefetchTop()
             }
             failed = ok == 0 && items.isEmpty()
             loading = false
             if (refreshAgain) { refreshAgain = false; refresh() }
         }
+    }
+
+    private var prefetchJob: kotlinx.coroutines.Job? = null
+
+    /** Haalt de bovenste 3 ongelezen artikelen alvast op de achtergrond op, zodat ze direct openen. Een voor een, om data en batterij te sparen. */
+    private fun prefetchTop() {
+        val top = ranked.filter { read[it.link] != true }.take(3)
+        prefetchJob?.cancel()
+        prefetchJob = viewModelScope.launch { top.forEach { runCatching { article(it) } } }
     }
 
     private fun weights(): Map<String, Double> {

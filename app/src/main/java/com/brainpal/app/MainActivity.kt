@@ -113,6 +113,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // De browser-tekst (voor het ophalen van artikelen) alvast opvragen zodra de app even stilstaat: scheelt wachttijd bij het eerste artikel.
+        android.os.Looper.myQueue().addIdleHandler { Net.browserUa; false }
         val vm = vm // `by viewModels()` is lazy: hier afdwingen, anders ontstaat de Vm alsnog binnen setContent
         setContent {
             val dark = isSystemInDarkTheme()
@@ -612,6 +614,16 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
             }
             when {
                 res == null || (gate && auto == 1) -> item {
+                    // Alvast tonen wat uit de feed al bekend is (niet elk bericht heeft een plaatje), terwijl de volledige tekst laadt.
+                    Column(Modifier.fillMaxWidth()) {
+                        item.img?.let { img ->
+                            NewsImage(img, item.link, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp)))
+                            Spacer(Modifier.height(20.dp))
+                        }
+                        if (item.summary.isNotEmpty()) {
+                            Text(item.summary, fontSize = 18.sp, lineHeight = 29.sp, fontFamily = FontFamily.Serif, color = cs.onSurfaceVariant)
+                        }
+                    }
                     Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = cs.primary)
                         if (gate) Text("Cookiemelding wordt geaccepteerd…", fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
