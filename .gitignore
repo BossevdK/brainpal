@@ -1,0 +1,11 @@
+# Bouwbestanden en lokale instellingen
+build/
+.gradle/
+.idea/
+local.properties
+*.apk
+
+# Ondertekeningssleutel: NOOIT in git zetten
+keystore.properties
+*.jks
+*.keystore

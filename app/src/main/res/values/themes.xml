@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BrainPal" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bp_bg</item>
+    </style>
+    <color name="bp_bg">#F6F5FF</color>
+    <color name="ic_bg">#5B4BDB</color>
+</resources>
