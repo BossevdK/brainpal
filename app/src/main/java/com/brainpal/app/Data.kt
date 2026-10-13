@@ -301,14 +301,15 @@ fun fetchFeed(src: Source, topic: String): List<Item> {
         if (src.name == "Hacker News") sum = hnSummary(sum)
         if (sum.startsWith(title, ignoreCase = true)) sum = sum.substring(title.length).trimStart(' ', ':', '.', '-', '–', '—')
         val img = (e.getElementsByTag("media:content") + e.getElementsByTag("media:thumbnail") + e.select("enclosure"))
-            .firstOrNull { el ->
+            .filter { el ->
                 val u = el.attr("url")
                 val type = el.attr("type")
                 u.isNotBlank() && el.attr("medium") != "video" && !type.startsWith("video") && !type.startsWith("audio") &&
                     (type.startsWith("image") || IMG_EXT.containsMatchIn(u))
-            }?.attr("url")
+            }
+            .maxByOrNull { it.attr("width").toIntOrNull() ?: 0 }?.attr("url") // meerdere formaten (The Guardian): de grootste
             ?: Jsoup.parse(rawDesc).selectFirst("img[src]")?.attr("src") // plaatje in de tekst van het bericht
-        Item(title, link, src.name, date, shorten(sum), https(img), topic)
+        Item(title, link, src.name, date, shorten(sum), https(img)?.let { sharper(it) }, topic)
     }.sortedByDescending { it.date }.take(12)
 }
 
@@ -318,6 +319,11 @@ private fun hnSummary(s: String): String {
     val comments = Regex("# Comments: ([0-9]+)").find(s)?.groupValues?.get(1)
     return listOfNotNull(points?.let { "$it punten" }, comments?.let { "$it reacties" }).joinToString(" · ")
 }
+
+/** Sommige feeds geven alleen een klein voorbeeldplaatje (NU.nl 256 px, BBC 240 px). Dezelfde sites hebben ook grotere versies. */
+private fun sharper(u: String): String = u
+    .replace("_sqr256/", "_sqr1024/")
+    .replace(Regex("""ichef\.bbci\.co\.uk/ace/standard/\d+/"""), "ichef.bbci.co.uk/ace/standard/976/")
 
 private val IMG_EXT = Regex("\\.(jpe?g|png|webp)", RegexOption.IGNORE_CASE)
 
