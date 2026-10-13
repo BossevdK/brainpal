@@ -610,27 +610,30 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
                 article == null -> item {
                     val ex = res?.exceptionOrNull()
                     val blocked = ex is HttpException && ex.code in listOf(401, 402, 403, 451) // betaalmuur of geblokkeerd
+                    val check = ex is HttpException && ex.code in listOf(403, 503) // bot-controle van de site (bijvoorbeeld Cloudflare)
                     val msg = if (gate || blocked) null else ex?.message
                     SectionCard {
                         Text(
                             if (gate) "${item.source} vraagt eerst om je cookie-keuze"
+                            else if (check) "${item.source} wil eerst controleren of je een mens bent"
                             else if (msg != null) "Laden mislukt" else "Dit artikel kan niet in de app worden getoond",
                             fontWeight = FontWeight.Bold, fontSize = 17.sp
                         )
                         Text(
                             if (gate) "Maak eenmalig zelf je keuze, daarna kan de app artikelen van deze sites laden. Of zet bij Instellingen \"Cookies automatisch accepteren\" aan."
+                            else if (check) "Doorloop de controle eenmalig in de app: de pagina opent hier. Daarna probeert BrainPal het artikel zelf te laden. Lukt dat niet, dan kun je het gewoon in die pagina lezen."
                             else msg ?: "Waarschijnlijk staat het achter een betaalmuur of blokkeert de site het lezen.",
                             fontSize = 14.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp)
                         )
                         if (item.summary.isNotEmpty()) {
                             Text(item.summary, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(bottom = 16.dp))
                         }
-                        if (gate) Button(onClick = { manual = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text("Cookie-keuze maken") }
-                        if (gate) Spacer(Modifier.height(8.dp))
+                        if (gate || check) Button(onClick = { manual = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (gate) "Cookie-keuze maken" else "Open in de app") }
+                        if (gate || check) Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { uri.openUri(item.link) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp),
-                            colors = if (gate) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors(),
-                            border = if (gate) BorderStroke(1.dp, cs.outlineVariant) else null
+                            colors = if (gate || check) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors(),
+                            border = if (gate || check) BorderStroke(1.dp, cs.outlineVariant) else null
                         ) { Text("Open op ${item.source}") }
                     }
                 }
@@ -669,7 +672,7 @@ fun ConsentView(item: Item, done: () -> Unit) {
     BackHandler { done() }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Maak je keuze en tik daarna op Klaar", fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text("Doorloop de pagina en tik daarna op Klaar", fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
             Button(onClick = done, shape = RoundedCornerShape(12.dp)) { Text("Klaar") }
         }
         AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx ->

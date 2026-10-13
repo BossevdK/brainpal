@@ -200,6 +200,17 @@ object Net {
 
     private var cacheDir: java.io.File? = null
 
+    /** Wordt bij het starten gezet; nodig om de gebruikersnaam-tekst van de ingebouwde browser op te vragen. */
+    var appContext: android.content.Context? = null
+
+    /**
+     * Dezelfde gebruikersnaam-tekst als de ingebouwde webweergave. Loop je daar een controle van een site door, dan geldt die ook
+     * voor de app, die deze tekst dan gebruikt bij het ophalen van artikelen.
+     */
+    val browserUa: String by lazy {
+        runCatching { android.webkit.WebSettings.getDefaultUserAgent(appContext!!) }.getOrDefault(BROWSER_UA)
+    }
+
     /** Wordt bij het starten van de app aangeroepen: zet de schijfcache aan voor (voorwaardelijke) verzoeken. */
     fun init(dir: java.io.File) { cacheDir = dir }
 
@@ -222,7 +233,7 @@ object Net {
     /** Geeft (body, eindurl) terug. */
     fun get(url: String, asBrowser: Boolean): Pair<String, String> {
         val req = Request.Builder().url(url)
-            .header("User-Agent", if (asBrowser) BROWSER_UA else FEED_UA)
+            .header("User-Agent", if (asBrowser) browserUa else FEED_UA)
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .header("Accept-Language", "nl,en;q=0.8")
             .build()

@@ -13,6 +13,7 @@ class BrainPalApp : Application(), ImageLoaderFactory {
         super.onCreate()
         installCrashScreen()
         Net.init(cacheDir)
+        Net.appContext = applicationContext
     }
 
     /**

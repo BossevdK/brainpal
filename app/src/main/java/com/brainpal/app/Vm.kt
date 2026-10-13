@@ -319,6 +319,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
     /** Haalt een artikel op voor de leesmodus. Null = kan niet in de app getoond worden. */
     suspend fun article(i: Item): Result<Article?> = withContext(Dispatchers.IO) {
         if (articles.containsKey(i.link)) return@withContext Result.success(articles[i.link])
+        withContext(Dispatchers.Main) { Net.browserUa } // de browser-tekst eenmalig op de hoofd-thread opvragen
         runCatching {
             val (html, finalUrl) = Net.get(i.link, asBrowser = true)
             extractArticle(html, finalUrl)
