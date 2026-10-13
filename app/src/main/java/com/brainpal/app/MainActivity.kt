@@ -96,7 +96,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.viewModels
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -107,6 +107,9 @@ private val BrandDark = Color(0xFF9B8FFF)
 private val Orange = Color(0xFFFF9D2E)
 
 class MainActivity : ComponentActivity() {
+    // Buiten de compositie aanmaken: een Vm die tijdens het tekenen ontstaat, geeft "Reading a state that was created after the snapshot was taken".
+    private val vm: Vm by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -125,7 +128,7 @@ class MainActivity : ComponentActivity() {
                     onSecondaryContainer = Color(0xFF1D1B3A), error = Color(0xFFD6403F)
                 )
             ) {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { App() }
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { App(vm) }
             }
         }
     }
@@ -153,7 +156,7 @@ private fun IconBtn(v: ImageVector, desc: String, tint: Color = MaterialTheme.co
     IconButton(onClick = onClick) { Ico(v, desc, tint) }
 
 @Composable
-fun App(vm: Vm = viewModel()) {
+fun App(vm: Vm) {
     var screen by rememberSaveable { mutableStateOf(Screen.Feed) }
     var reading by remember { mutableStateOf<Item?>(null) }
     // Scrollstand staat hier, boven het artikel, zodat de feed op dezelfde plek terugkomt na het lezen.
