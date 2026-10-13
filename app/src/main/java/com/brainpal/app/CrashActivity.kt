@@ -42,6 +42,38 @@ class CrashActivity : Activity() {
                 (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("crash", text))
             }
         }
+        val status = TextView(this).apply {
+            textSize = 14f
+            setTextColor(Color.DKGRAY)
+            setPadding(pad, pad / 2, pad, 0)
+            visibility = android.view.View.GONE
+        }
+        val upd = Button(this).apply { this.text = "Controleer op updates" }
+        var info: UpdateInfo? = null
+        var apk: java.io.File? = null
+        fun say(t: String) = runOnUiThread { status.text = t; status.visibility = android.view.View.VISIBLE }
+        upd.setOnClickListener {
+            val i = info
+            upd.isEnabled = false
+            Thread {
+                try {
+                    if (i == null) {
+                        say("Controleren…")
+                        val found = checkForUpdate(currentVersion(this))
+                        info = found
+                        if (found == null) say("Je hebt de nieuwste versie. Stuur de foutmelding hierboven door.")
+                        else { say("Versie ${found.version} is beschikbaar."); runOnUiThread { upd.text = "Download en installeer ${found.version}" } }
+                    } else {
+                        val file = apk ?: downloadUpdate(this, i) { p -> say("Downloaden… ${(p * 100).toInt()}%") }.also { apk = it }
+                        if (installApk(this, file)) say("Het installatiescherm van Android opent.")
+                        else say("Zet bij de instelling die nu opent 'Toestaan' aan voor BrainPal, ga terug en tik nog een keer op de knop.")
+                    }
+                } catch (e: Exception) {
+                    say("Mislukt: ${e.message ?: "geen verbinding"}")
+                }
+                runOnUiThread { upd.isEnabled = true }
+            }.start()
+        }
         val body = TextView(this).apply {
             this.text = text
             textSize = 10f
@@ -57,6 +89,8 @@ class CrashActivity : Activity() {
             addView(title)
             addView(hint)
             addView(copy)
+            addView(upd)
+            addView(status)
             addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }
         setContentView(root)
