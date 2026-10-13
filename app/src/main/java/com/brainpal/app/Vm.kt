@@ -35,6 +35,13 @@ class Vm(app: Application) : AndroidViewModel(app) {
     val read = mutableStateMapOf<String, Boolean>()
     val saved = mutableStateListOf<Item>()
 
+    /** Door jou aan- of uitgezette bronnen ("onderwerp/bronnaam" -> aan of uit). Wat er niet in staat volgt de standaard van de bron. */
+    val sourceOverride = mutableStateMapOf<String, Boolean>()
+    private val topicFetched = HashMap<String, Long>()
+
+    /** Je 👍/👎 tellen pas mee voor de volgorde bij het volgende vernieuwen, zodat de lijst niet onder je vingers verschuift. */
+    private var frozenWeights by mutableStateOf<Map<String, Double>>(emptyMap())
+
     /** Gelezen artikelen zakken pas bij het volgende vernieuwen naar onderen, niet terwijl je nog aan het lezen bent. */
     private var sunk by mutableStateOf<Set<String>>(emptySet())
     private val voteMeta = HashMap<String, Pair<String, String>>() // link -> (topic, bron)
@@ -62,7 +69,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
             if (!cacheFile.exists()) return
             val o = JSONObject(cacheFile.readText())
             val a = o.getJSONArray("items")
-            val list = (0 until a.length()).map { itemFromJson(a.getJSONObject(it)) }.filter { it.topic in topics }
+            val list = (0 until a.length()).map { itemFromJson(a.getJSONObject(it)) }.filter { it.topic in topics && visible(it) }
             if (list.isNotEmpty()) { items = list.distinctBy { it.link }; updated = o.getLong("at") }
         }
     }
@@ -85,8 +92,11 @@ class Vm(app: Application) : AndroidViewModel(app) {
             for (i in 0 until r.length()) read[r.getString(i)] = true
             val s = JSONArray(prefs.getString("saved", "[]")!!)
             for (i in 0 until s.length()) saved.add(itemFromJson(s.getJSONObject(i)))
+            val so = JSONObject(prefs.getString("srcOverride", "{}")!!)
+            for (k in so.keys()) sourceOverride[k] = so.getBoolean(k)
         }
         sunk = read.keys.toSet()
+        frozenWeights = weights()
         loadCache()
         if (notify) scheduleNews(app)
         refreshIfStale()
@@ -118,7 +128,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
         val r = JSONArray(); read.keys.toList().takeLast(500).forEach { r.put(it) }
         val s = JSONArray(); saved.forEach { s.put(itemToJson(it)) }
         prefs.edit().putString("topics", topics.joinToString(",")).putString("votes", v.toString())
-            .putString("vmeta", m.toString()).putString("read", r.toString()).putString("saved", s.toString()).apply()
+            .putString("srcOverride", JSONObject(sourceOverride.toMap<String, Any>()).toString()).putString("vmeta", m.toString()).putString("read", r.toString()).putString("saved", s.toString()).apply()
     }
 
     fun chooseTopics(t: List<String>) {
@@ -129,33 +139,68 @@ class Vm(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
+    fun sourceOn(t: Topic, s: Source): Boolean = sourceOverride["${t.id}/${s.name}"] ?: s.default
+    fun enabledSources(t: Topic): List<Source> = t.sources.filter { sourceOn(t, it) }
+
+    private fun visible(i: Item): Boolean {
+        val t = topicOf(i.topic) ?: return false
+        val s = t.sources.firstOrNull { it.name == i.source } ?: return true
+        return sourceOn(t, s)
+    }
+
+    private var topicJob: kotlinx.coroutines.Job? = null
+
+    /** Zet een bron aan of uit. Uit: de berichten verdwijnen meteen. Aan: alleen dat onderwerp wordt (even later) opnieuw opgehaald. */
+    fun setSource(t: Topic, s: Source, on: Boolean) {
+        sourceOverride["${t.id}/${s.name}"] = on
+        persist()
+        if (!on) {
+            items = items.filter { !(it.topic == t.id && it.source == s.name) }
+        } else {
+            topicJob?.cancel()
+            topicJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(1200) // wacht even als je er meerdere aanzet
+                while (loading) kotlinx.coroutines.delay(300)
+                refresh(only = t.id)
+            }
+        }
+    }
+
     fun refreshIfStale() {
         if (topics.isNotEmpty() && !loading && System.currentTimeMillis() - updated > 10 * 60_000) refresh()
     }
 
-    fun refresh() {
+    /** Tik op een onderwerp: alleen de bronnen van dat onderwerp vernieuwen, en alleen als ze ouder zijn dan 10 minuten. */
+    fun refreshTopicIfStale(id: String) {
         if (loading) return
-        val wanted = topics.mapNotNull { topicOf(it) }
+        if (System.currentTimeMillis() - (topicFetched[id] ?: updated) > 10 * 60_000) refresh(only = id)
+    }
+
+    /** Vernieuwt alle gekozen onderwerpen, of alleen `only`. Haalt alleen de aangezette bronnen op. */
+    fun refresh(only: String? = null) {
+        if (loading) return
+        val wanted = topics.mapNotNull { topicOf(it) }.filter { only == null || it.id == only }
         if (wanted.isEmpty()) return
         loading = true; failed = false
-        sunk = read.keys.toSet()
+        sunk = read.keys.toSet()          // gelezen artikelen zakken nu pas
+        frozenWeights = weights()         // en je 👍/👎 tellen nu pas mee voor de volgorde
         viewModelScope.launch {
             val byTopic = HashMap<String, List<Item>>(items.groupBy { it.topic })
             var ok = 0
             wanted.map { t ->
                 async(Dispatchers.IO) {
-                    val lists = t.feeds.map { (src, url) ->
-                        async { runCatching { fetchFeed(src, url, t.id) }.getOrNull() }
-                    }.awaitAll()
+                    val sources = enabledSources(t)
+                    val lists = sources.map { src -> async { runCatching { fetchFeed(src, t.id) }.getOrNull() } }.awaitAll()
                     val merged = lists.filterNotNull().flatten().distinctBy { it.link }.sortedByDescending { it.date }.take(40)
                     withContext(Dispatchers.Main) {
-                        if (merged.isNotEmpty()) { byTopic[t.id] = merged; ok++ }
+                        if (merged.isNotEmpty()) { byTopic[t.id] = merged; ok++ } else if (sources.isEmpty()) byTopic.remove(t.id)
+                        topicFetched[t.id] = System.currentTimeMillis()
                         items = byTopic.values.flatten().distinctBy { it.link } // meteen tonen wat al binnen is; zelfde bericht in twee onderwerpen telt eenmaal
                     }
                 }
             }.awaitAll()
             if (ok > 0) {
-                updated = System.currentTimeMillis()
+                if (only == null) updated = System.currentTimeMillis()
                 val snapshot = items
                 launch(Dispatchers.IO) { saveCache(snapshot) }
             }
@@ -175,7 +220,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
 
     /** Nieuw eerst, met een duwtje voor onderwerpen en bronnen die je waardeert. */
     private fun computeRanked(): List<Item> {
-        val w = weights(); val now = System.currentTimeMillis()
+        val w = frozenWeights; val now = System.currentTimeMillis()
         return items.distinctBy { it.link }.filter { votes[it.link] != -1 && (filter == null || it.topic == filter) }
             .sortedByDescending {
                 -(now - it.date) / 3.6e6 + 6 * tanh((w[it.topic] ?: 0.0) / 3) +

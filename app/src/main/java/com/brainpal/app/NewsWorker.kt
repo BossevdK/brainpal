@@ -57,8 +57,9 @@ class NewsWorker(private val ctx: Context, params: WorkerParameters) : Coroutine
         val base = prefs.getLong("notifBase", 0L)
         if (base == 0L) { prefs.edit().putLong("notifBase", now).apply(); return Result.success() }
 
+        val so = JSONObject(prefs.getString("srcOverride", "{}")!!)
         val items = coroutineScope {
-            topics.flatMap { t -> t.feeds.map { (s, u) -> async(Dispatchers.IO) { runCatching { fetchFeed(s, u, t.id) }.getOrNull() } } }
+            topics.flatMap { t -> t.sources.filter { so.optBoolean(t.id + "/" + it.name, it.default) }.map { s -> async(Dispatchers.IO) { runCatching { fetchFeed(s, t.id) }.getOrNull() } } }
                 .awaitAll().filterNotNull().flatten()
         }
         if (items.isEmpty()) return Result.retry()

@@ -16,7 +16,10 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
-data class Topic(val id: String, val name: String, val emoji: String, val feeds: List<Pair<String, String>>, val strict: Boolean = false)
+/** Een nieuwsbron. `default`: staat standaard aan. `must`: alleen berichten waarvan de titel hierbij past. */
+data class Source(val name: String, val url: String, val default: Boolean = true, val must: Regex? = null)
+
+data class Topic(val id: String, val name: String, val emoji: String, val sources: List<Source>, val strict: Boolean = false)
 
 data class Item(
     val title: String,
@@ -32,50 +35,129 @@ data class Block(val type: String, val text: String) // type: h, p, li
 
 data class Article(val title: String, val image: String?, val blocks: List<Block>, val url: String)
 
+/** Alleen berichten waarvan de titel over AI gaat (voor bronnen die ook over andere dingen schrijven). */
+private const val AI_WORDS = "(?<![a-z])(ai|a[.]i[.]|artificial intelligence|machine learning|deep learning|llms?|gpt[-0-9a-z]*|chatgpt|openai|anthropic|claude|gemini|deepseek|grok|mistral|llama|midjourney|sora|copilot|neural|chatbots?|generative|nvidia|robot(s|ics)?|diffusion)(?![a-z])"
+
+private fun s(name: String, url: String, on: Boolean = true, must: String? = null) =
+    Source(name, url, on, must?.let { Regex(it, RegexOption.IGNORE_CASE) })
+
 val TOPICS = listOf(
     Topic("nieuws", "Nieuws", "📰", listOf(
-        "NOS" to "https://feeds.nos.nl/nosnieuwsalgemeen", "NU.nl" to "https://www.nu.nl/rss/Algemeen",
-        "NRC" to "https://www.nrc.nl/rss/", "Volkskrant" to "https://www.volkskrant.nl/voorpagina/rss.xml",
-        "DutchNews" to "https://www.dutchnews.nl/feed/", "BBC" to "https://feeds.bbci.co.uk/news/world/rss.xml",
-        "The Guardian" to "https://www.theguardian.com/world/rss")),
+        s("NOS", "https://feeds.nos.nl/nosnieuwsalgemeen"),
+        s("NU.nl", "https://www.nu.nl/rss/Algemeen"),
+        s("NRC", "https://www.nrc.nl/rss/"),
+        s("Volkskrant", "https://www.volkskrant.nl/voorpagina/rss.xml"),
+        s("DutchNews", "https://www.dutchnews.nl/feed/"),
+        s("BBC", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+        s("The Guardian", "https://www.theguardian.com/world/rss"),
+        s("RTL Nieuws", "https://www.rtl.nl/rss.xml", on = false),
+        s("Telegraaf", "https://www.telegraaf.nl/rss", on = false),
+        s("Parool", "https://www.parool.nl/rss.xml", on = false),
+        s("AD", "https://www.ad.nl/rss.xml", on = false),
+        s("Trouw", "https://www.trouw.nl/rss.xml", on = false),
+        s("NOS Politiek", "https://feeds.nos.nl/nosnieuwspolitiek", on = false),
+        s("NOS Binnenland", "https://feeds.nos.nl/nosnieuwsbinnenland", on = false),
+        s("NOS Buitenland", "https://feeds.nos.nl/nosnieuwsbuitenland", on = false),
+        s("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", on = false),
+        s("DW", "https://rss.dw.com/rdf/rss-en-all", on = false),
+        s("NPR", "https://feeds.npr.org/1001/rss.xml", on = false)
+    )),
     Topic("tech", "Tech", "💻", listOf(
-        "Tweakers" to "https://tweakers.net/feeds/mixed.xml", "NU.nl" to "https://www.nu.nl/rss/Tech",
-        "The Verge" to "https://www.theverge.com/rss/index.xml", "Ars Technica" to "https://feeds.arstechnica.com/arstechnica/index",
-        "Wired" to "https://www.wired.com/feed/rss", "TechCrunch" to "https://techcrunch.com/feed/")),
+        s("Tweakers", "https://tweakers.net/feeds/mixed.xml"),
+        s("NU.nl", "https://www.nu.nl/rss/Tech"),
+        s("The Verge", "https://www.theverge.com/rss/index.xml"),
+        s("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
+        s("Wired", "https://www.wired.com/feed/rss"),
+        s("TechCrunch", "https://techcrunch.com/feed/"),
+        s("Bright", "https://www.bright.nl/rss", on = false),
+        s("iCulture", "https://www.iculture.nl/feed/", on = false),
+        s("Androidplanet", "https://www.androidplanet.nl/feed/", on = false),
+        s("Engadget", "https://www.engadget.com/rss.xml", on = false),
+        s("9to5Google", "https://9to5google.com/feed/", on = false),
+        s("TechRadar", "https://www.techradar.com/rss", on = false),
+        s("The Register", "https://www.theregister.com/headlines.atom", on = false),
+        s("BBC Tech", "https://feeds.bbci.co.uk/news/technology/rss.xml", on = false)
+    )),
     Topic("ai", "AI", "🤖", listOf(
-        "MIT Tech Review" to "https://www.technologyreview.com/feed/", "Hacker News" to "https://hnrss.org/frontpage",
-        "Ars Technica" to "https://arstechnica.com/ai/feed/", "OpenAI" to "https://openai.com/news/rss.xml")),
+        s("MIT Tech Review", "https://www.technologyreview.com/feed/", must = AI_WORDS),
+        s("Hacker News", "https://hnrss.org/frontpage", must = AI_WORDS),
+        s("Ars Technica", "https://arstechnica.com/ai/feed/"),
+        s("OpenAI", "https://openai.com/news/rss.xml"),
+        s("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", on = false),
+        s("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/", on = false),
+        s("Google AI", "https://blog.google/technology/ai/rss/", on = false),
+        s("Hugging Face", "https://huggingface.co/blog/feed.xml", on = false),
+        s("MIT News AI", "https://news.mit.edu/rss/topic/artificial-intelligence2", on = false),
+        s("Wired AI", "https://www.wired.com/feed/tag/ai/latest/rss", on = false)
+    )),
     Topic("wetenschap", "Wetenschap", "🔬", listOf(
-        "NU.nl" to "https://www.nu.nl/rss/Wetenschap", "ScienceDaily" to "https://www.sciencedaily.com/rss/top/science.xml",
-        "Quanta" to "https://api.quantamagazine.org/feed/", "New Scientist" to "https://www.newscientist.com/feed/home/",
-        "Nature" to "https://www.nature.com/nature.rss", "Phys.org" to "https://phys.org/rss-feed/")),
+        s("NU.nl", "https://www.nu.nl/rss/Wetenschap"),
+        s("ScienceDaily", "https://www.sciencedaily.com/rss/top/science.xml"),
+        s("Quanta", "https://api.quantamagazine.org/feed/"),
+        s("New Scientist", "https://www.newscientist.com/feed/home/"),
+        s("Nature", "https://www.nature.com/nature.rss"),
+        s("Phys.org", "https://phys.org/rss-feed/"),
+        s("Scientias", "https://www.scientias.nl/feed/", on = false),
+        s("Quest", "https://www.quest.nl/rss", on = false),
+        s("BBC Science", "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", on = false)
+    )),
     Topic("ruimte", "Ruimte", "🪐", listOf(
-        "NASA" to "https://www.nasa.gov/feed/", "Space.com" to "https://www.space.com/feeds/all",
-        "SpaceNews" to "https://spacenews.com/feed/", "Universe Today" to "https://www.universetoday.com/feed",
-        "ESA" to "https://www.esa.int/rssfeed/Our_Activities/Space_Science")),
+        s("NASA", "https://www.nasa.gov/feed/"),
+        s("Space.com", "https://www.space.com/feeds/all"),
+        s("SpaceNews", "https://spacenews.com/feed/"),
+        s("Universe Today", "https://www.universetoday.com/feed"),
+        s("ESA", "https://www.esa.int/rssfeed/Our_Activities/Space_Science")
+    )),
     Topic("economie", "Economie", "💶", listOf(
-        "NOS" to "https://feeds.nos.nl/nosnieuwseconomie", "NU.nl" to "https://www.nu.nl/rss/Economie",
-        "BBC" to "https://feeds.bbci.co.uk/news/business/rss.xml", "CNBC" to "https://www.cnbc.com/id/10001147/device/rss/rss.html")),
+        s("NOS", "https://feeds.nos.nl/nosnieuwseconomie"),
+        s("NU.nl", "https://www.nu.nl/rss/Economie"),
+        s("BBC", "https://feeds.bbci.co.uk/news/business/rss.xml"),
+        s("CNBC", "https://www.cnbc.com/id/10001147/device/rss/rss.html")
+    )),
     Topic("sport", "Sport", "⚽", listOf(
-        "NOS" to "https://feeds.nos.nl/nossportalgemeen", "NU.nl" to "https://www.nu.nl/rss/Sport",
-        "BBC Sport" to "https://feeds.bbci.co.uk/sport/rss.xml", "ESPN" to "https://www.espn.com/espn/rss/news")),
+        s("NOS", "https://feeds.nos.nl/nossportalgemeen"),
+        s("NU.nl", "https://www.nu.nl/rss/Sport"),
+        s("BBC Sport", "https://feeds.bbci.co.uk/sport/rss.xml"),
+        s("ESPN", "https://www.espn.com/espn/rss/news"),
+        s("NU Voetbal", "https://www.nu.nl/rss/Voetbal", on = false),
+        s("BBC Football", "https://feeds.bbci.co.uk/sport/football/rss.xml", on = false)
+    )),
     Topic("cultuur", "Cultuur", "🎬", listOf(
-        "NOS" to "https://feeds.nos.nl/nosnieuwscultuurenmedia", "NU.nl" to "https://www.nu.nl/rss/Entertainment",
-        "NU.nl Film" to "https://www.nu.nl/rss/Film", "The Guardian" to "https://www.theguardian.com/culture/rss")),
+        s("NOS", "https://feeds.nos.nl/nosnieuwscultuurenmedia"),
+        s("NU.nl", "https://www.nu.nl/rss/Entertainment"),
+        s("NU.nl Film", "https://www.nu.nl/rss/Film"),
+        s("The Guardian", "https://www.theguardian.com/culture/rss"),
+        s("BBC Entertainment", "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml", on = false),
+        s("Variety", "https://variety.com/feed/", on = false)
+    )),
     Topic("gezondheid", "Gezondheid", "🫀", listOf(
-        "NU.nl" to "https://www.nu.nl/rss/Gezondheid", "ScienceDaily" to "https://www.sciencedaily.com/rss/health_medicine.xml",
-        "BBC" to "https://feeds.bbci.co.uk/news/health/rss.xml", "WHO" to "https://www.who.int/rss-feeds/news-english.xml")),
+        s("NU.nl", "https://www.nu.nl/rss/Gezondheid"),
+        s("ScienceDaily", "https://www.sciencedaily.com/rss/health_medicine.xml"),
+        s("BBC", "https://feeds.bbci.co.uk/news/health/rss.xml"),
+        s("WHO", "https://www.who.int/rss-feeds/news-english.xml")
+    )),
     Topic("gaming", "Gaming", "🎮", listOf(
-        "IGN" to "https://www.ign.com/rss/articles/feed?tags=games", "GameSpot" to "https://www.gamespot.com/feeds/mashup/",
-        "Eurogamer" to "https://www.eurogamer.net/feed", "PC Gamer" to "https://www.pcgamer.com/rss/",
-        "Kotaku" to "https://kotaku.com/rss", "Rock Paper Shotgun" to "https://www.rockpapershotgun.com/feed",
-        "Nintendo Life" to "https://www.nintendolife.com/feeds/latest", "Push Square" to "https://www.pushsquare.com/feeds/latest",
-        "GamesIndustry.biz" to "https://www.gamesindustry.biz/feed"), strict = true),
+        s("IGN", "https://www.ign.com/rss/articles/feed?tags=games"),
+        s("GameSpot", "https://www.gamespot.com/feeds/mashup/"),
+        s("Eurogamer", "https://www.eurogamer.net/feed"),
+        s("PC Gamer", "https://www.pcgamer.com/rss/"),
+        s("Kotaku", "https://kotaku.com/rss"),
+        s("Rock Paper Shotgun", "https://www.rockpapershotgun.com/feed"),
+        s("Nintendo Life", "https://www.nintendolife.com/feeds/latest"),
+        s("Push Square", "https://www.pushsquare.com/feeds/latest"),
+        s("GamesIndustry.biz", "https://www.gamesindustry.biz/feed"),
+        s("Gamekings", "https://www.gamekings.tv/feed/", on = false)
+    ), strict = true),
     Topic("opmerkelijk", "Opmerkelijk", "✨", listOf(
-        "NOS" to "https://feeds.nos.nl/nosnieuwsopmerkelijk", "NU.nl" to "https://www.nu.nl/rss/Opmerkelijk")),
+        s("NOS", "https://feeds.nos.nl/nosnieuwsopmerkelijk"),
+        s("NU.nl", "https://www.nu.nl/rss/Opmerkelijk")
+    )),
 )
 
 fun topicOf(id: String): Topic? = TOPICS.firstOrNull { it.id == id }
+
+/** De site gaf een foutcode terug (bijvoorbeeld 401 of 403 bij een betaalmuur). */
+class HttpException(val code: Int) : IOException("De bron antwoordde met $code")
 
 /** Site vraagt eerst om een cookie-keuze (DPG Media: Tweakers, NU.nl, Volkskrant). */
 class ConsentGateException : IOException("consent")
@@ -140,7 +222,7 @@ object Net {
         }
         response.use { r ->
             if (r.request.url.host.endsWith("dpgmedia.nl")) throw ConsentGateException()
-            if (!r.isSuccessful) throw IOException("De bron antwoordde met ${r.code}")
+            if (!r.isSuccessful) throw HttpException(r.code)
             val body = r.body?.string() ?: throw IOException("Lege reactie")
             return body.take(2_500_000) to r.request.url.toString()
         }
@@ -165,8 +247,13 @@ private fun shorten(s: String, max: Int = 240): String {
     return if (end > 100) cut.substring(0, end + 1) else cut.replace(Regex("\\s+\\S*$"), "") + "…"
 }
 
-fun fetchFeed(source: String, url: String, topic: String): List<Item> {
-    val (body, _) = Net.get(url, asBrowser = false)
+fun fetchFeed(src: Source, topic: String): List<Item> {
+    val (body, _) = try {
+        Net.get(src.url, asBrowser = false)
+    } catch (e: IOException) {
+        // hnrss.org is soms even onbereikbaar: dan de officiële (eenvoudigere) Hacker News-feed
+        if (src.name == "Hacker News") Net.get("https://news.ycombinator.com/rss", asBrowser = false) else throw e
+    }
     // Sommige feeds zijn enorm (honderden berichten). We willen er maar 12, dus parseer alleen het begin: scheelt tijd en batterij.
     val doc = Jsoup.parse(if (body.length > 250_000) body.substring(0, 250_000) else body, "", Parser.xmlParser())
     return doc.select("item, entry").mapNotNull { e ->
@@ -178,6 +265,7 @@ fun fetchFeed(source: String, url: String, topic: String): List<Item> {
         val cats = catList.joinToString("|")
         if (isAd(title, link, cats)) return@mapNotNull null // advertenties en kortingscodes
         if (topicOf(topic)?.strict == true && offTopic(title, link, catList)) return@mapNotNull null // film/tv in een gamesfeed
+        if (src.must != null && !src.must.containsMatchIn(title)) return@mapNotNull null // bron die ook over andere dingen schrijft
         val date = parseDate(
             (e.selectFirst("pubDate") ?: e.selectFirst("published") ?: e.selectFirst("updated")
                 ?: e.getElementsByTag("dc:date").firstOrNull())?.text()
@@ -185,6 +273,7 @@ fun fetchFeed(source: String, url: String, topic: String): List<Item> {
         val rawDesc = (e.selectFirst("description") ?: e.selectFirst("summary") ?: e.getElementsByTag("content:encoded").firstOrNull()
             ?: e.selectFirst("content"))?.text().orEmpty()
         var sum = plain(rawDesc)
+        if (src.name == "Hacker News") sum = hnSummary(sum)
         if (sum.startsWith(title, ignoreCase = true)) sum = sum.substring(title.length).trimStart(' ', ':', '.', '-', '–', '—')
         val img = (e.getElementsByTag("media:content") + e.getElementsByTag("media:thumbnail") + e.select("enclosure"))
             .firstOrNull { el ->
@@ -194,8 +283,15 @@ fun fetchFeed(source: String, url: String, topic: String): List<Item> {
                     (type.startsWith("image") || IMG_EXT.containsMatchIn(u))
             }?.attr("url")
             ?: Jsoup.parse(rawDesc).selectFirst("img[src]")?.attr("src") // plaatje in de tekst van het bericht
-        Item(title, link, source, date, shorten(sum), https(img), topic)
+        Item(title, link, src.name, date, shorten(sum), https(img), topic)
     }.sortedByDescending { it.date }.take(12)
+}
+
+/** De Hacker News-feed zet alleen links en tellers in de omschrijving: maak er een korte regel van. */
+private fun hnSummary(s: String): String {
+    val points = Regex("Points: ([0-9]+)").find(s)?.groupValues?.get(1)
+    val comments = Regex("# Comments: ([0-9]+)").find(s)?.groupValues?.get(1)
+    return listOfNotNull(points?.let { "$it punten" }, comments?.let { "$it reacties" }).joinToString(" · ")
 }
 
 private val IMG_EXT = Regex("\\.(jpe?g|png|webp)", RegexOption.IGNORE_CASE)

@@ -235,7 +235,7 @@ fun FeedScreen(vm: Vm, listState: LazyListState, onUpdate: () -> Unit, open: (It
     val cs = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Header("BrainPal", if (vm.updated > 0) "Bijgewerkt ${ago(vm.updated)} geleden" else null) {
-            IconBtn(Ic.Refresh, "Vernieuwen") { vm.refresh() }
+            IconBtn(Ic.Refresh, "Vernieuwen") { vm.refresh(only = vm.filter) }
         }
         if (vm.loading) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = cs.primary, trackColor = cs.outlineVariant)
         else Spacer(Modifier.height(2.dp))
@@ -254,7 +254,7 @@ fun FeedScreen(vm: Vm, listState: LazyListState, onUpdate: () -> Unit, open: (It
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item { TopicChip("Alles", vm.filter == null) { vm.filter = null; scope.launch { listState.scrollToItem(0) } } }
-            items(vm.topics) { id -> TopicChip(topicOf(id)!!.name, vm.filter == id) { vm.filter = id; scope.launch { listState.scrollToItem(0) } } }
+            items(vm.topics) { id -> TopicChip(topicOf(id)!!.name, vm.filter == id) { vm.filter = id; vm.refreshTopicIfStale(id); scope.launch { listState.scrollToItem(0) } } }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
@@ -452,6 +452,30 @@ fun SettingsScreen(vm: Vm, done: () -> Unit) {
             }
             item {
                 SectionCard {
+                    Text("Bronnen", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                    Text(
+                        "Kies per onderwerp welke bronnen je wilt. Alleen aangezette bronnen worden opgehaald: minder bronnen is sneller.",
+                        fontSize = 13.sp, lineHeight = 18.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp)
+                    )
+                    vm.topics.mapNotNull { topicOf(it) }.forEach { t ->
+                        var open by rememberSaveable(t.id) { mutableStateOf(false) }
+                        HorizontalDivider(Modifier.padding(top = 12.dp), color = cs.outlineVariant)
+                        Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(t.name, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                            Text("${vm.enabledSources(t).size} van ${t.sources.size} aan", fontSize = 13.sp, color = cs.onSurfaceVariant)
+                            Text(if (open) "  ▴" else "  ▾", color = cs.onSurfaceVariant)
+                        }
+                        if (open) t.sources.forEach { s ->
+                            Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(s.name, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                                Switch(checked = vm.sourceOn(t, s), onCheckedChange = { vm.setSource(t, s, it) })
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                SectionCard {
                     Text("Updates", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                     Text("Je gebruikt versie ${vm.appVersion}.", fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
                     val u = vm.update
@@ -584,7 +608,8 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
                 }
                 article == null -> item {
                     val ex = res?.exceptionOrNull()
-                    val msg = if (gate) null else ex?.message
+                    val blocked = ex is HttpException && ex.code in listOf(401, 402, 403, 451) // betaalmuur of geblokkeerd
+                    val msg = if (gate || blocked) null else ex?.message
                     SectionCard {
                         Text(
                             if (gate) "${item.source} vraagt eerst om je cookie-keuze"
