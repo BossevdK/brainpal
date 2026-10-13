@@ -135,6 +135,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private val ItemSaver = androidx.compose.runtime.saveable.Saver<Item?, ArrayList<String>>(
+    save = { i -> i?.let { arrayListOf(it.title, it.link, it.source, it.date.toString(), it.summary, it.img ?: "", it.topic) } ?: arrayListOf() },
+    restore = { l -> if (l.size < 7) null else Item(l[0], l[1], l[2], l[3].toLong(), l[4], l[5].ifEmpty { null }, l[6]) }
+)
+
 enum class Screen(val label: String, val icon: ImageVector) {
     Feed("Feed", Ic.Feed), Saved("Bewaard", Ic.Bookmark), Settings("Instellingen", Ic.Settings)
 }
@@ -159,7 +164,8 @@ private fun IconBtn(v: ImageVector, desc: String, tint: Color = MaterialTheme.co
 @Composable
 fun App(vm: Vm) {
     var screen by rememberSaveable { mutableStateOf(Screen.Feed) }
-    var reading by remember { mutableStateOf<Item?>(null) }
+    // Blijft staan als Android de app tussendoor uit het geheugen haalt (het artikel wordt dan opnieuw geladen).
+    var reading by rememberSaveable(stateSaver = ItemSaver) { mutableStateOf<Item?>(null) }
     // Scrollstand staat hier, boven het artikel, zodat de feed op dezelfde plek terugkomt na het lezen.
     val feedState = rememberLazyListState()
     val savedState = rememberLazyListState()

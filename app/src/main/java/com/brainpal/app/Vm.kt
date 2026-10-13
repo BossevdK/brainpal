@@ -33,6 +33,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
 
     val votes = mutableStateMapOf<String, Int>()
     val read = mutableStateMapOf<String, Boolean>()
+    private val readOrder = ArrayList<String>() // oudste eerst: de map zelf heeft geen vaste volgorde
     val saved = mutableStateListOf<Item>()
 
     /** Door jou aan- of uitgezette bronnen ("onderwerp/bronnaam" -> aan of uit). Wat er niet in staat volgt de standaard van de bron. */
@@ -92,7 +93,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
                 m.optJSONArray(k)?.let { voteMeta[k] = it.getString(0) to it.getString(1) }
             }
             val r = JSONArray(prefs.getString("read", "[]")!!)
-            for (i in 0 until r.length()) read[r.getString(i)] = true
+            for (i in 0 until r.length()) { val l = r.getString(i); read[l] = true; readOrder.add(l) }
             val s = JSONArray(prefs.getString("saved", "[]")!!)
             for (i in 0 until s.length()) saved.add(itemFromJson(s.getJSONObject(i)))
             val so = JSONObject(prefs.getString("srcOverride", "{}")!!)
@@ -129,7 +130,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
             v.put(k, x)
             voteMeta[k]?.let { m.put(k, JSONArray().put(it.first).put(it.second)) }
         }
-        val r = JSONArray(); read.keys.toList().takeLast(500).forEach { r.put(it) }
+        val r = JSONArray(); readOrder.takeLast(500).forEach { r.put(it) }
         val s = JSONArray(); saved.forEach { s.put(itemToJson(it)) }
         prefs.edit().putString("topics", topics.joinToString(",")).putString("votes", v.toString())
             .putString("srcOverride", JSONObject(sourceOverride.toMap<String, Any>()).toString()).putString("vmeta", m.toString()).putString("read", r.toString()).putString("saved", s.toString()).apply()
@@ -140,8 +141,10 @@ class Vm(app: Application) : AndroidViewModel(app) {
         items = items.filter { it.topic in t }
         if (filter != null && filter !in t) filter = null
         persist()
-        refresh()
+        if (loading) refreshAgain = true else refresh() // loopt er al een vernieuwing, dan start de volgende zodra die klaar is
     }
+
+    private var refreshAgain = false
 
     fun sourceOn(t: Topic, s: Source): Boolean = sourceOverride["${t.id}/${s.name}"] ?: s.default
     fun enabledSources(t: Topic): List<Source> = t.sources.filter { sourceOn(t, it) }
@@ -200,7 +203,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
                     withContext(Dispatchers.Main) {
                         if (merged.isNotEmpty()) { byTopic[t.id] = merged; ok++ } else if (sources.isEmpty()) byTopic.remove(t.id)
                         topicFetched[t.id] = System.currentTimeMillis()
-                        items = byTopic.values.flatten().distinctBy { it.link } // meteen tonen wat al binnen is; zelfde bericht in twee onderwerpen telt eenmaal
+                        items = byTopic.values.flatten().filter { it.topic in topics }.distinctBy { it.link } // meteen tonen wat al binnen is; zelfde bericht in twee onderwerpen telt eenmaal
                     }
                 }
             }.awaitAll()
@@ -211,6 +214,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
             }
             failed = ok == 0 && items.isEmpty()
             loading = false
+            if (refreshAgain) { refreshAgain = false; refresh() }
         }
     }
 
@@ -312,17 +316,23 @@ class Vm(app: Application) : AndroidViewModel(app) {
 
     fun switchAutoCookies(on: Boolean) { autoCookies = on; prefs.edit().putBoolean("autoCookies", on).apply() }
 
-    fun forget(link: String) { articles.remove(link) }
+    fun forget(link: String) { synchronized(articles) { articles.remove(link) } }
 
-    fun markRead(i: Item) { read[i.link] = true; persist() }
+    fun markRead(i: Item) {
+        if (read[i.link] != true) {
+            read[i.link] = true; readOrder.add(i.link)
+            while (readOrder.size > 500) read.remove(readOrder.removeAt(0))
+            persist()
+        }
+    }
 
     /** Haalt een artikel op voor de leesmodus. Null = kan niet in de app getoond worden. */
     suspend fun article(i: Item): Result<Article?> = withContext(Dispatchers.IO) {
-        if (articles.containsKey(i.link)) return@withContext Result.success(articles[i.link])
+        synchronized(articles) { if (articles.containsKey(i.link)) return@withContext Result.success(articles[i.link]) }
         withContext(Dispatchers.Main) { Net.browserUa } // de browser-tekst eenmalig op de hoofd-thread opvragen
         runCatching {
             val (html, finalUrl) = Net.get(i.link, asBrowser = true)
             extractArticle(html, finalUrl)
-        }.onSuccess { articles[i.link] = it }
+        }.onSuccess { synchronized(articles) { articles[i.link] = it } }
     }
 }
