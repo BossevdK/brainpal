@@ -58,6 +58,9 @@ class Vm(app: Application) : AndroidViewModel(app) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Article?>?) = size > 30
     }
 
+    /** Waarom een artikel niet getoond kon worden (pagina-adres, grootte, titel): helpt bij het opsporen van sites die niet lukken. */
+    val failNotes = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     private val cacheFile = java.io.File(app.filesDir, "feed-cache.json")
 
     /** Bewaart de laatste feed op schijf, zodat de app bij het starten meteen iets toont. */
@@ -332,7 +335,14 @@ class Vm(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { Net.browserUa } // de browser-tekst eenmalig op de hoofd-thread opvragen
         runCatching {
             val (html, finalUrl) = Net.get(i.link, asBrowser = true)
-            extractArticle(html, finalUrl)
+            val a = extractArticle(html, finalUrl)
+            if (a == null) {
+                val d = org.jsoup.Jsoup.parse(html)
+                val txt = d.body().text()
+                failNotes[i.link] = "Pagina: ${android.net.Uri.parse(finalUrl).host}, ${html.length / 1000} kB html, ${txt.length} tekens tekst. " +
+                    "Titel: \"${d.title().take(80)}\". Begin: \"${txt.take(160)}\""
+            }
+            a
         }.onSuccess { synchronized(articles) { articles[i.link] = it } }
     }
 }

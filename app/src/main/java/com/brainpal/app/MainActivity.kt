@@ -638,12 +638,15 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
                         if (item.summary.isNotEmpty()) {
                             Text(item.summary, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.padding(bottom = 16.dp))
                         }
-                        if (gate || check) Button(onClick = { manual = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (gate) "Cookie-keuze maken" else "Open in de app") }
-                        if (gate || check) Spacer(Modifier.height(8.dp))
+                        val noText = ex == null // pagina geladen, maar geen leesbare tekst: misschien een cookiemuur of betaalmuur
+                        val note = vm.failNotes[item.link]
+                        if (noText && note != null) Text(note, fontSize = 11.sp, lineHeight = 15.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(bottom = 14.dp))
+                        if (gate || check || noText) Button(onClick = { manual = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (gate) "Cookie-keuze maken" else "Open in de app") }
+                        if (gate || check || noText) Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = { uri.openUri(item.link) }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp),
-                            colors = if (gate || check) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors(),
-                            border = if (gate || check) BorderStroke(1.dp, cs.outlineVariant) else null
+                            colors = if (gate || check || noText) ButtonDefaults.outlinedButtonColors() else ButtonDefaults.buttonColors(),
+                            border = if (gate || check || noText) BorderStroke(1.dp, cs.outlineVariant) else null
                         ) { Text("Open op ${item.source}") }
                     }
                 }
