@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BrainPal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BrainPal">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f6f5ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13121f" media="(prefers-color-scheme: dark)">
+<style>
+:root{
+  --bg:#f6f5ff; --card:#fff; --ink:#1d1b3a; --muted:#66638c; --line:#e4e1fa; --chip:#eae7fb;
+  --brand:#5b4bdb; --on-brand:#fff; --orange:#ff9d2e; --sel:#e3deff;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#13121f;--card:#1c1a2e;--ink:#efeeff;--muted:#a9a6cc;--line:#2e2b4a;--chip:#2a2745;--brand:#9b8fff;--on-brand:#14112e;--sel:#332f5c}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;
+  padding-top:env(safe-area-inset-top);padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+button:focus-visible,a:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+svg.i.on{fill:currentColor}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:env(safe-area-inset-top);margin-top:calc(-1 * env(safe-area-inset-top))}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 4px 2px 4px}
+h1{font-size:26px;font-weight:800;margin:0;letter-spacing:-.3px}
+.sub{font-size:13px;color:var(--muted)}
+.ibtn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.ibtn.active{color:var(--brand)}
+.progress{height:2px;background:var(--line);overflow:hidden;opacity:0;transition:opacity .2s}
+.progress.on{opacity:1}
+.progress i{display:block;height:100%;width:40%;background:var(--brand);animation:slide 1s infinite ease-in-out}
+@keyframes slide{0%{margin-left:-40%}100%{margin-left:100%}}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:8px 15px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:14px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.banner{background:var(--brand);color:var(--on-brand);border-radius:14px;padding:12px 16px;margin:4px 0 10px;font-weight:600;display:flex;justify-content:space-between;width:100%}
+article{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:14px}
+article .pic{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--chip)}
+article .body{padding:14px 16px 4px;display:block;color:inherit;text-decoration:none}
+.meta{display:flex;align-items:center;font-size:12px;color:var(--muted);gap:6px;white-space:nowrap;overflow:hidden}
+.meta b{color:var(--brand);font-weight:600}
+.meta .dot{width:8px;height:8px;border-radius:50%;background:var(--orange);flex:none}
+.meta span{overflow:hidden;text-overflow:ellipsis}
+article h2{font-size:18px;line-height:1.3;font-weight:600;margin:8px 0 6px}
+article.read h2{color:var(--muted)}
+article p{margin:0 0 4px;font-size:14px;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.acts{display:flex;align-items:center;padding:0 6px 2px}
+.acts .sp{flex:1}
+.acts .ibtn[aria-pressed="true"]{color:var(--brand)}
+.empty{text-align:center;color:var(--muted);padding:56px 24px}
+.empty .i{margin:0 auto 12px;width:40px;height:40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px}
+.card h3{font-size:16px;margin:0 0 4px}
+.note{font-size:13px;color:var(--muted);margin:0}
+.btn{display:block;width:100%;background:var(--brand);color:var(--on-brand);border-radius:14px;padding:14px;font-weight:600;text-align:center;margin-top:14px}
+.btn:disabled{opacity:.45}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink)}
+.chipgrid{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chipgrid .chip{padding:10px 14px;font-size:15px}
+.hero{padding:30px 4px 10px}
+.hero h1{font-size:28px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav .in{max-width:640px;margin:0 auto;display:flex}
+.tab{flex:1;padding:8px 0 7px;display:grid;justify-items:center;gap:2px;font-size:12px;font-weight:600;color:var(--muted)}
+.tab[aria-current="page"]{color:var(--brand)}
+.tab .pill{padding:3px 20px;border-radius:99px}
+.tab[aria-current="page"] .pill{background:var(--sel)}
+@media (prefers-reduced-motion:reduce){.progress i{animation:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="top"><div><h1>BrainPal</h1><div class="sub" id="sub"></div></div><button class="ibtn" id="refresh" aria-label="Vernieuwen"></button></div>
+  <div class="progress" id="progress"><i></i></div>
+  <div class="chips" id="chips" role="group" aria-label="Filter op onderwerp"></div>
+</div></header>
+<div class="wrap"><main id="app"></main></div>
+<nav aria-label="Hoofdmenu"><div class="in" id="nav"></div></nav>
+
+<script>
+/* ---- iconen (lijn = uit, gevuld = aan) ---- */
+const P={
+  bookmark:["M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"],
+  up:["M7 10v12","M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"],
+  down:["M17 14V2","M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"],
+  refresh:["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8","M21 3v5h-5","M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16","M8 16H3v5"],
+  feed:["M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2","M18 14h-8","M15 18h-5","M10 6h8v4h-8V6Z"],
+  settings:["M21 4h-7","M10 4H3","M21 12h-9","M8 12H3","M21 20h-5","M12 20H3","M14 2v4","M8 10v4","M16 18v4"]
+};
+const icon=(n,on)=>`<svg class="i${on?" on":""}" viewBox="0 0 24 24" aria-hidden="true">${P[n].map(d=>`<path d="${d}"/>`).join("")}</svg>`;
+
+/* ---- opslag: alles blijft op dit apparaat ---- */
+const KEY="brainpal-web-v1";
+const fresh=()=>({topics:[],filter:"all",read:{},vote:{},vmeta:{},saved:{},lastVisit:0});
+let S;try{S=Object.assign(fresh(),JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){S=fresh()}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const prevVisit=S.lastVisit; S.lastVisit=Date.now(); save();
+let sunk=new Set(Object.keys(S.read)); // gelezen artikelen zakken pas bij het volgende laden, niet terwijl je leest
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let TOPICS=[],items=[],updated=0,loading=true,failed=false,view="feed";
+const ago=t=>{const m=Math.floor((Date.now()-t)/6e4);if(m<1)return"nu";if(m<60)return m+" min";const h=Math.floor(m/60);return h<24?h+" u":Math.floor(h/24)+" d"};
+const topicName=id=>(TOPICS.find(t=>t.id===id)||{}).n||id;
+
+async function load(){
+  loading=true;failed=false;paint();
+  try{
+    const r=await fetch("data/feed.json?t="+Date.now(),{cache:"no-store"});
+    if(!r.ok)throw new Error(r.status);
+    const j=await r.json();
+    TOPICS=j.topics;items=j.items;updated=j.updated;sunk=new Set(Object.keys(S.read));calcWeights();
+  }catch(e){failed=!items.length}
+  loading=false;render();
+}
+
+/* ---- volgorde: nieuw eerst, met een duwtje voor wat je waardeert ---- */
+// De weging wordt alleen bij het laden vastgelegd: een 👍 schuift de lijst dus niet meteen om terwijl je leest (een 👎 verbergt het artikel wel direct).
+let W={};
+function calcWeights(){W={};for(const l in S.vote){const m=S.vmeta[l];if(m){W[m.p]=(W[m.p]||0)+S.vote[l];W["s:"+m.s]=(W["s:"+m.s]||0)+S.vote[l]}}}
+calcWeights();
+function ranked(){
+  const w=W;
+  const now=Date.now();
+  return items.filter(i=>S.topics.includes(i.p)&&S.vote[i.l]!==-1&&(S.filter==="all"||i.p===S.filter))
+    .map(i=>({i,s:-(now-i.d)/36e5+6*Math.tanh((w[i.p]||0)/3)+3*Math.tanh((w["s:"+i.s]||0)/3)-(sunk.has(i.l)?100:0)}))
+    .sort((a,b)=>b.s-a.s).map(x=>x.i);
+}
+
+function card(i){
+  const isNew=prevVisit&&i.d>prevVisit&&!S.read[i.l], liked=S.vote[i.l]===1, saved=!!S.saved[i.l];
+  return `<article class="${S.read[i.l]?"read":""}" data-l="${esc(i.l)}">
+    ${i.i?`<img class="pic" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" src="${esc(i.i)}" onerror="this.remove()">`:""}
+    <a class="body" href="${esc(i.l)}" target="_blank" rel="noopener" data-act="open">
+      <div class="meta">${isNew?'<i class="dot"></i>':""}<b>${esc(topicName(i.p))}</b><span>· ${esc(i.s)} · ${ago(i.d)}</span></div>
+      <h2>${esc(i.t)}</h2>${i.m?`<p>${esc(i.m)}</p>`:""}
+    </a>
+    <div class="acts">
+      <button class="ibtn" data-act="up" aria-pressed="${liked}" aria-label="Meer hiervan">${icon("up",liked)}</button>
+      <button class="ibtn" data-act="down" aria-label="Minder hiervan">${icon("down")}</button>
+      <span class="sp"></span>
+      <button class="ibtn" data-act="save" aria-pressed="${saved}" aria-label="${saved?"Verwijder uit bewaard":"Bewaar"}">${icon("bookmark",saved)}</button>
+    </div></article>`;
+}
+function bind(list){
+  document.querySelectorAll("article").forEach(a=>{
+    const l=a.dataset.l, it=list.find(x=>x.l===l);
+    a.querySelectorAll("[data-act]").forEach(b=>b.onclick=e=>{
+      const act=b.dataset.act;
+      if(act==="open"){S.read[l]=1;save();a.classList.add("read");return} // blijft op zijn plek staan
+      if(act==="up"||act==="down")S.vmeta[l]={p:it.p,s:it.s};
+      if(act==="up")S.vote[l]=S.vote[l]===1?0:1;
+      if(act==="down")S.vote[l]=-1;
+      if(act==="save"){if(S.saved[l])delete S.saved[l];else S.saved[l]=it}
+      save();render(true);
+    });
+  });
+}
+
+function renderChips(){
+  const c=$("#chips");
+  if(view!=="feed"||!S.topics.length){c.style.display="none";return}
+  c.style.display="flex";
+  c.innerHTML=[["all","Alles"],...S.topics.map(id=>[id,topicName(id)])].map(([k,n])=>`<button class="chip" data-f="${k}" aria-pressed="${S.filter===k}">${esc(n)}</button>`).join("");
+  c.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;save();render();scrollTo(0,0)});
+}
+function renderNav(){
+  if(!S.topics.length){$("#nav").innerHTML="";return}
+  $("#nav").innerHTML=[["feed","Feed"],["saved","Bewaard"],["settings","Instellingen"]].map(([k,n])=>
+    `<button class="tab" data-v="${k}" ${view===k?'aria-current="page"':""}><span class="pill">${icon(k==="saved"?"bookmark":k,k==="saved"&&view===k)}</span>${n}</button>`).join("");
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{view=b.dataset.v;render();scrollTo(0,0)});
+}
+function paint(){$("#progress").classList.toggle("on",loading)}
+
+function render(keepScroll){
+  const y=scrollY;
+  paint();
+  $("#refresh").innerHTML=icon("refresh");$("#refresh").style.visibility=S.topics.length&&view==="feed"?"visible":"hidden";
+  $("#sub").textContent=updated&&view==="feed"&&S.topics.length?"Bijgewerkt "+ago(updated)+" geleden":"";
+  renderNav();renderChips();
+  const app=$("#app");
+  if(!S.topics.length||view==="settings")renderSettings(app);
+  else if(view==="saved"){
+    const list=Object.values(S.saved).reverse();
+    app.innerHTML=list.length?list.map(card).join(""):`<div class="empty">${icon("bookmark")}<b>Nog niets bewaard</b><p class="note">Tik bij een artikel op het bladwijzer-icoon om het hier te bewaren.</p></div>`;
+    bind(list);
+  }else{
+    const list=ranked();
+    app.innerHTML=failed?`<div class="empty"><b>Geen verbinding</b><p class="note">Het nieuws kon niet worden geladen.</p><button class="btn" id="retry">Opnieuw proberen</button></div>`
+      :(!list.length&&loading)?`<div class="empty note">Nieuws laden…</div>`
+      :list.length?list.map(card).join(""):`<div class="empty note">Niets gevonden voor dit filter.</div>`;
+    bind(list);const r=$("#retry");if(r)r.onclick=load;
+  }
+  if(keepScroll)scrollTo(0,y);
+}
+
+function renderSettings(app){
+  const first=!S.topics.length, sel=new Set(S.topics);
+  const all=TOPICS.length?TOPICS:[];
+  app.innerHTML=`${first?`<div class="hero"><h1>Welkom bij BrainPal</h1><p class="note" style="margin-top:6px;font-size:15px">Elke dag het nieuws in kort bestek, over onderwerpen die jij kiest. Wat je 👍 geeft komt vaker terug.</p></div>`:`<h1 style="padding:6px 4px 12px">Instellingen</h1>`}
+    <div class="card"><h3>${first?"Kies je onderwerpen":"Onderwerpen"}</h3>
+      <div class="chipgrid">${all.map(t=>`<button class="chip" data-t="${t.id}" aria-pressed="${sel.has(t.id)}">${t.e}&nbsp; ${esc(t.n)}</button>`).join("")||'<span class="note">Laden…</span>'}</div>
+      <button class="btn" id="ok" disabled>${first?"Toon mijn feed":"Opslaan"}</button></div>
+    ${first?"":`<div class="card"><h3>Installeren op je iPhone</h3><p class="note">Open BrainPal in Safari, tik op Deel en kies "Zet op beginscherm". Daarna werkt het als een app. Nieuwe versies verschijnen vanzelf.</p></div>
+    <div class="card"><h3>Je gegevens</h3><p class="note">Onderwerpen, 👍, bewaarde artikelen en gelezen berichten staan alleen op dit toestel.</p>
+      <button class="btn ghost" id="reset">Alles wissen</button></div>`}`;
+  const ok=$("#ok");
+  const sync=()=>{const now=[...app.querySelectorAll('.chip[aria-pressed="true"]')].map(c=>c.dataset.t);ok.disabled=!now.length||(!first&&now.slice().sort().join()===S.topics.slice().sort().join());return now};
+  app.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{b.setAttribute("aria-pressed",String(b.getAttribute("aria-pressed")!=="true"));sync()});
+  sync();
+  ok.onclick=()=>{S.topics=sync();if(S.filter!=="all"&&!S.topics.includes(S.filter))S.filter="all";save();view="feed";render();scrollTo(0,0)};
+  const rs=$("#reset");if(rs)rs.onclick=()=>{if(confirm("Alles wissen? Dit kan niet ongedaan worden gemaakt.")){S=fresh();save();sunk=new Set();view="feed";render()}};
+}
+
+$("#refresh").onclick=load;
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-updated>10*6e4&&S.topics.length)load()});
+if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+load();
+</script>
+</body>
+</html>

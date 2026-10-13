@@ -9,3 +9,6 @@ local.properties
 keystore.properties
 *.jks
 *.keystore
+
+# Door de GitHub-taak gemaakt bij het publiceren
+web/data/
