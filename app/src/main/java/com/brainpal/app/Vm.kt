@@ -124,7 +124,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
 
     private fun itemFromJson(o: JSONObject) = Item(
         o.getString("t"), o.getString("l"), o.getString("s"), o.getLong("d"), o.getString("m"),
-        o.getString("i").ifEmpty { null }, o.getString("p")
+        o.getString("i").ifEmpty { null }?.let { sharper(it) }, o.getString("p")
     )
 
     private var persistJob: kotlinx.coroutines.Job? = null

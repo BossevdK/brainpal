@@ -194,6 +194,7 @@ private object WebViewCookies : CookieJar {
 }
 
 object Net {
+    private const val BOT_UA = "BrainPal/1.0 (+https://github.com/BossevdK/brainpal)"
     private const val FEED_UA = "BrainPal/1.0 (+personal news reader)"
     const val BROWSER_UA =
         "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
@@ -232,8 +233,18 @@ object Net {
 
     /** Geeft (body, eindurl) terug. */
     fun get(url: String, asBrowser: Boolean): Pair<String, String> {
+        if (!asBrowser) return fetch(url, FEED_UA)
+        return try {
+            fetch(url, browserUa)
+        } catch (e: HttpException) {
+            // Sommige sites (bijvoorbeeld Phys.org) blokkeren nagemaakte browsers, maar laten een app door die zich eerlijk bekendmaakt.
+            if (e.code == 403 || e.code == 503) fetch(url, BOT_UA) else throw e
+        }
+    }
+
+    private fun fetch(url: String, ua: String): Pair<String, String> {
         val req = Request.Builder().url(url)
-            .header("User-Agent", if (asBrowser) browserUa else FEED_UA)
+            .header("User-Agent", ua)
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .header("Accept-Language", "nl,en;q=0.8")
             .build()
@@ -320,10 +331,12 @@ private fun hnSummary(s: String): String {
     return listOfNotNull(points?.let { "$it punten" }, comments?.let { "$it reacties" }).joinToString(" · ")
 }
 
-/** Sommige feeds geven alleen een klein voorbeeldplaatje (NU.nl 256 px, BBC 240 px). Dezelfde sites hebben ook grotere versies. */
-private fun sharper(u: String): String = u
+/** Sommige feeds geven alleen een klein voorbeeldplaatje (NU.nl 256 px, BBC 240 px, Volkskrant 320 px, Phys.org 90 px). Dezelfde sites hebben ook grotere versies. */
+fun sharper(u: String): String = u
     .replace("_sqr256/", "_sqr1024/")
-    .replace(Regex("""ichef\.bbci\.co\.uk/ace/standard/\d+/"""), "ichef.bbci.co.uk/ace/standard/976/")
+    .replace(Regex("""ichef\.bbci\.co\.uk/ace/standard/\d+/"""), "ichef.bbci.co.uk/ace/standard/1536/")
+    .replace(Regex("""image\.volkskrant\.nl/(\d+)/feature-crop/\d+/\d+/"""), "image.volkskrant.nl/$1/feature-crop/1024/576/")
+    .replace("/csz/news/tmb/", "/csz/news/800a/")
 
 private val IMG_EXT = Regex("\\.(jpe?g|png|webp)", RegexOption.IGNORE_CASE)
 
@@ -354,7 +367,7 @@ private fun isAd(title: String, link: String, cats: String): Boolean {
 
 private val JUNK = Regex(
     "^(advertentie|lees ook|lees meer|volg ons|abonneer|©|copyright|deel dit|share|related|aanmelden|inloggen|meld je aan|" +
-        "edited by|reviewed by|see more|the original article|this is today's edition|discover the cosmos|introduction$)",
+        "edited by|reviewed by|this article has been reviewed|see more|the original article|this is today's edition|discover the cosmos|introduction$)",
     RegexOption.IGNORE_CASE
 )
 
