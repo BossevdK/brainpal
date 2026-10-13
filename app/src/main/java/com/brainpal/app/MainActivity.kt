@@ -338,8 +338,10 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
         border = BorderStroke(1.dp, cs.outlineVariant),
     ) {
         Column(Modifier.clickable { open(i) }) {
-            if (i.img != null) {
-                NewsImage(i.img, i.link, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+            val img = i.img ?: vm.ogImages[i.link]
+            androidx.compose.runtime.LaunchedEffect(i.link) { vm.loadOgImage(i) }
+            if (img != null) {
+                NewsImage(img, i.link, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

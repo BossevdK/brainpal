@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -61,12 +62,35 @@ class Vm(app: Application) : AndroidViewModel(app) {
     /** Waarom een artikel niet getoond kon worden (pagina-adres, grootte, titel): helpt bij het opsporen van sites die niet lukken. */
     val failNotes = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    /** Plaatjes van de artikelpagina (og:image) voor berichten waarvan de feed er geen heeft. */
+    val ogImages = mutableStateMapOf<String, String>()
+    private val ogTried = HashSet<String>()
+    private val ogLimit = kotlinx.coroutines.sync.Semaphore(2)
+
+    /** Haalt, als de feed geen plaatje geeft, het plaatje van de artikelpagina op. Maximaal twee tegelijk, één keer per bericht. */
+    fun loadOgImage(i: Item) {
+        if (i.img != null || i.source == "Hacker News" || i.link in ogImages || !ogTried.add(i.link)) return
+        viewModelScope.launch {
+            val url = ogLimit.withPermit {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        withContext(Dispatchers.Main) { Net.browserUa }
+                        val (html, finalUrl) = Net.get(i.link, asBrowser = true)
+                        org.jsoup.Jsoup.parse(html, finalUrl).selectFirst("meta[property=og:image]")?.absUrl("content")
+                            ?.takeIf { it.isNotBlank() }?.let { sharper(https(it) ?: it) }
+                    }.getOrNull()
+                }
+            }
+            if (url != null) ogImages[i.link] = url
+        }
+    }
+
     private val cacheFile = java.io.File(app.filesDir, "feed-cache.json")
 
     /** Bewaart de laatste feed op schijf, zodat de app bij het starten meteen iets toont. */
     private fun saveCache(list: List<Item>) {
         runCatching {
-            val a = JSONArray(); list.forEach { a.put(itemToJson(it)) }
+            val a = JSONArray(); list.forEach { a.put(itemToJson(if (it.img == null) ogImages[it.link]?.let { u -> it.copy(img = u) } ?: it else it)) }
             cacheFile.writeText(JSONObject().put("at", System.currentTimeMillis()).put("items", a).toString())
         }
     }

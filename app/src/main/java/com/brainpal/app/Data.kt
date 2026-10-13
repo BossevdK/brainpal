@@ -320,6 +320,8 @@ fun fetchFeed(src: Source, topic: String): List<Item> {
             }
             .maxByOrNull { it.attr("width").toIntOrNull() ?: 0 }?.attr("url") // meerdere formaten (The Guardian): de grootste
             ?: Jsoup.parse(rawDesc).selectFirst("img[src]")?.attr("src") // plaatje in de tekst van het bericht
+            ?: (e.selectFirst("content") ?: e.getElementsByTag("content:encoded").firstOrNull())?.text()
+                ?.let { Jsoup.parse(it).selectFirst("img[src]")?.attr("src") } // en in de volledige tekst (The Verge)
         Item(title, link, src.name, date, shorten(sum), https(img)?.let { sharper(it) }, topic)
     }.sortedByDescending { it.date }.take(12)
 }
@@ -331,12 +333,13 @@ private fun hnSummary(s: String): String {
     return listOfNotNull(points?.let { "$it punten" }, comments?.let { "$it reacties" }).joinToString(" · ")
 }
 
-/** Sommige feeds geven alleen een klein voorbeeldplaatje (NU.nl 256 px, BBC 240 px, Volkskrant 320 px, Phys.org 90 px). Dezelfde sites hebben ook grotere versies. */
+/** Sommige feeds geven alleen een klein voorbeeldplaatje (NU.nl 256 px, BBC 240 px, Volkskrant 320 px, Phys.org 90 px, GameSpot 300 px). Dezelfde sites hebben ook grotere versies. */
 fun sharper(u: String): String = u
     .replace("_sqr256/", "_sqr1024/")
     .replace(Regex("""ichef\.bbci\.co\.uk/ace/standard/\d+/"""), "ichef.bbci.co.uk/ace/standard/1536/")
     .replace(Regex("""image\.volkskrant\.nl/(\d+)/feature-crop/\d+/\d+/"""), "image.volkskrant.nl/$1/feature-crop/1024/576/")
     .replace("/csz/news/tmb/", "/csz/news/800a/")
+    .replace(Regex("""(gamespot\.com/wp-content/uploads/[^?]+\?w=)\d+""")) { it.groupValues[1] + "1024" }
 
 private val IMG_EXT = Regex("\\.(jpe?g|png|webp)", RegexOption.IGNORE_CASE)
 
