@@ -9,14 +9,7 @@ Het nieuws wordt op de telefoon opgehaald uit openbare RSS-feeds. Geen account e
 - Meldingen bij nieuw nieuws
 - Updates via GitHub: de app controleert of er een nieuwere release is en installeert die op verzoek
 
-## Webversie (iPhone en andere apparaten)
-
-Dezelfde app als website: **https://bossevdk.github.io/brainpal/**. Open die in Safari, tik op Deel en kies "Zet op beginscherm".
-Je onderwerpen, 👍 en bewaarde artikelen blijven op je eigen toestel (localStorage). Een GitHub-taak (`.github/workflows/pages.yml`) haalt
-elke ~30 minuten het nieuws op (`scripts/fetch-feeds.mjs`) en publiceert het samen met de site (`web/`).
-Artikelen open je op de site van de bron; de webversie slaat geen artikeltekst op.
-
-## Installeren (Android)
+## Installeren
 
 Download `BrainPal.apk` bij de nieuwste [Release](../../releases/latest) en open het bestand op je telefoon.
 Android vraagt eenmalig toestemming om apps van buiten de Play Store te installeren.
