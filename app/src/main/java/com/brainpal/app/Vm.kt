@@ -42,6 +42,9 @@ class Vm(app: Application) : AndroidViewModel(app) {
     /** Je 👍/👎 tellen pas mee voor de volgorde bij het volgende vernieuwen, zodat de lijst niet onder je vingers verschuift. */
     private var frozenWeights by mutableStateOf<Map<String, Double>>(emptyMap())
 
+    /** Berichten met een 👎 verdwijnen pas bij het volgende vernieuwen (tot dan kun je het nog terugdraaien). */
+    private var hidden by mutableStateOf<Set<String>>(emptySet())
+
     /** Gelezen artikelen zakken pas bij het volgende vernieuwen naar onderen, niet terwijl je nog aan het lezen bent. */
     private var sunk by mutableStateOf<Set<String>>(emptySet())
     private val voteMeta = HashMap<String, Pair<String, String>>() // link -> (topic, bron)
@@ -97,6 +100,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
         }
         sunk = read.keys.toSet()
         frozenWeights = weights()
+        hidden = votes.filterValues { it == -1 }.keys.toSet()
         loadCache()
         if (notify) scheduleNews(app)
         refreshIfStale()
@@ -184,6 +188,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
         loading = true; failed = false
         sunk = read.keys.toSet()          // gelezen artikelen zakken nu pas
         frozenWeights = weights()         // en je 👍/👎 tellen nu pas mee voor de volgorde
+        hidden = votes.filterValues { it == -1 }.keys.toSet()
         viewModelScope.launch {
             val byTopic = HashMap<String, List<Item>>(items.groupBy { it.topic })
             var ok = 0
@@ -221,16 +226,27 @@ class Vm(app: Application) : AndroidViewModel(app) {
     /** Nieuw eerst, met een duwtje voor onderwerpen en bronnen die je waardeert. */
     private fun computeRanked(): List<Item> {
         val w = frozenWeights; val now = System.currentTimeMillis()
-        return items.distinctBy { it.link }.filter { votes[it.link] != -1 && (filter == null || it.topic == filter) }
+        return items.distinctBy { it.link }.filter { it.link !in hidden && (filter == null || displayTopic(it) == filter) }
             .sortedByDescending {
                 -(now - it.date) / 3.6e6 + 6 * tanh((w[it.topic] ?: 0.0) / 3) +
                     3 * tanh((w["s:${it.source}"] ?: 0.0) / 3) - (if (it.link in sunk) 100 else 0)
             }
     }
 
+    /** Bij welk onderwerp een bericht staat: dat van de bron, tenzij het inhoudelijk bij een ander gekozen onderwerp hoort (bijvoorbeeld een AI-bericht van een techsite). */
+    fun displayTopic(i: Item): String {
+        val t = topicOf(i.topic) ?: return i.topic
+        for (r in t.reroute) {
+            if (r.to in topics && (r.title.containsMatchIn(i.title) || (r.summary != null && r.summary.containsMatchIn(i.summary)))) return r.to
+        }
+        return i.topic
+    }
+
     fun vote(i: Item, up: Boolean) {
         voteMeta[i.link] = i.topic to i.source
-        votes[i.link] = if (up) (if (votes[i.link] == 1) 0 else 1) else -1
+        val now = votes[i.link]
+        // Nog een keer tikken draait het terug. Een 👎 verbergt het bericht pas bij het volgende vernieuwen.
+        votes[i.link] = if (up) (if (now == 1) 0 else 1) else (if (now == -1) 0 else -1)
         persist()
     }
 

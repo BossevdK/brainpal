@@ -319,6 +319,7 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
     val isNew = vm.prevVisit > 0 && i.date > vm.prevVisit && !isRead
     val saved = vm.isSaved(i.link)
     val liked = vm.votes[i.link] == 1
+    val disliked = vm.votes[i.link] == -1
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = cs.surface),
@@ -334,13 +335,13 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(Orange))
                         Spacer(Modifier.width(6.dp))
                     }
-                    Text(topicOf(i.topic)?.name ?: i.topic, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = cs.primary)
+                    Text(topicOf(vm.displayTopic(i))?.name ?: i.topic, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = cs.primary)
                     Text("  ·  ${i.source}  ·  ${ago(i.date)}", fontSize = 12.sp, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     i.title, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 4, overflow = TextOverflow.Ellipsis,
-                    color = if (isRead) cs.onSurfaceVariant else cs.onSurface
+                    color = if (isRead || disliked) cs.onSurfaceVariant else cs.onSurface
                 )
                 if (i.summary.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
@@ -349,7 +350,7 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconBtn(if (liked) Ic.ThumbUpFilled else Ic.ThumbUp, "Meer hiervan", if (liked) cs.primary else cs.onSurfaceVariant) { vm.vote(i, true) }
-                IconBtn(Ic.ThumbDown, "Minder hiervan") { vm.vote(i, false) }
+                IconBtn(if (disliked) Ic.ThumbDownFilled else Ic.ThumbDown, "Minder hiervan", if (disliked) cs.primary else cs.onSurfaceVariant) { vm.vote(i, false) }
                 Spacer(Modifier.weight(1f))
                 IconBtn(if (saved) Ic.BookmarkFilled else Ic.Bookmark, if (saved) "Verwijder uit bewaard" else "Bewaar", if (saved) cs.primary else cs.onSurfaceVariant) { vm.toggleSaved(i) }
             }
@@ -591,7 +592,7 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 40.dp)) {
             item {
-                Text(topicOf(item.topic)?.name?.uppercase() ?: "", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cs.primary, letterSpacing = 1.sp)
+                Text(topicOf(vm.displayTopic(item))?.name?.uppercase() ?: "", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cs.primary, letterSpacing = 1.sp)
                 Text(
                     article?.title?.takeIf { it.isNotBlank() } ?: item.title,
                     fontSize = 26.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif,

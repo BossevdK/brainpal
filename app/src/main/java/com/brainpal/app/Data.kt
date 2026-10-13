@@ -19,7 +19,10 @@ import java.util.concurrent.TimeUnit
 /** Een nieuwsbron. `default`: staat standaard aan. `must`: alleen berichten waarvan de titel hierbij past. */
 data class Source(val name: String, val url: String, val default: Boolean = true, val must: Regex? = null)
 
-data class Topic(val id: String, val name: String, val emoji: String, val sources: List<Source>, val strict: Boolean = false)
+data class Topic(
+    val id: String, val name: String, val emoji: String, val sources: List<Source>,
+    val strict: Boolean = false, val reroute: List<Reroute> = emptyList(),
+)
 
 data class Item(
     val title: String,
@@ -37,6 +40,17 @@ data class Article(val title: String, val image: String?, val blocks: List<Block
 
 /** Alleen berichten waarvan de titel over AI gaat (voor bronnen die ook over andere dingen schrijven). */
 private const val AI_WORDS = "(?<![a-z])(ai|a[.]i[.]|artificial intelligence|machine learning|deep learning|llms?|gpt[-0-9a-z]*|chatgpt|openai|anthropic|claude|gemini|deepseek|grok|mistral|llama|midjourney|sora|copilot|neural|chatbots?|generative|nvidia|robot(s|ics)?|diffusion)(?![a-z])"
+
+/** Een bron schrijft soms over iets dat bij een ander onderwerp hoort. Past de titel (of bij `summary` de omschrijving), dan staat het bericht bij `to`, maar alleen als je dat onderwerp hebt gekozen. */
+class Reroute(val to: String, val title: Regex, val summary: Regex? = null)
+
+private const val AI_STRONG = "(?<![a-z])(openai|chatgpt|anthropic|claude|llms?|gpt[-0-9a-z]*|gemini|copilot|generative ai|artificial intelligence)(?![a-z])"
+private const val GAME_WORDS = "(?<![a-z])(games?(?![-a-z])|gaming|gamers?|playstation|ps5|ps4|xbox|nintendo|switch 2|steam deck|steam machine|steam frame|steam sale|fortnite|minecraft|esports|twitch|call of duty|gta|zelda|mario|pok[eé]mon|elden ring|riot games|epic games|ubisoft|activision|blizzard|bethesda|rockstar|capcom|konami|sega|square enix|meta quest|oculus)(?![a-z])"
+private const val SPACE_WORDS = "(?<![a-z])(nasa|esa|spacex|space station|astronauts?|mars|moon|lunar|rockets?|satellites?|telescopes?|james webb|jwst|hubble|galaxy|galaxies|exoplanets?|asteroids?|comets?|black holes?|supernova|cosmic|cosmos|solar system|big bang|dark matter|artemis|starship|starlink|maan|raket|sterrenkunde|heelal|melkweg|zwart gat|planeet|ruimtevaart)(?![a-z])"
+private fun rx(s: String) = Regex(s, RegexOption.IGNORE_CASE)
+private val AI_REROUTE = Reroute("ai", rx(AI_WORDS), rx(AI_STRONG))
+private val GAME_REROUTE = Reroute("gaming", rx(GAME_WORDS))
+private val SPACE_REROUTE = Reroute("ruimte", rx(SPACE_WORDS))
 
 private fun s(name: String, url: String, on: Boolean = true, must: String? = null) =
     Source(name, url, on, must?.let { Regex(it, RegexOption.IGNORE_CASE) })
@@ -77,7 +91,7 @@ val TOPICS = listOf(
         s("TechRadar", "https://www.techradar.com/rss", on = false),
         s("The Register", "https://www.theregister.com/headlines.atom", on = false),
         s("BBC Tech", "https://feeds.bbci.co.uk/news/technology/rss.xml", on = false)
-    )),
+    ), reroute = listOf(AI_REROUTE, GAME_REROUTE)),
     Topic("ai", "AI", "🤖", listOf(
         s("MIT Tech Review", "https://www.technologyreview.com/feed/", must = AI_WORDS),
         s("Hacker News", "https://hnrss.org/frontpage", must = AI_WORDS),
@@ -100,7 +114,7 @@ val TOPICS = listOf(
         s("Scientias", "https://www.scientias.nl/feed/", on = false),
         s("Quest", "https://www.quest.nl/rss", on = false),
         s("BBC Science", "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", on = false)
-    )),
+    ), reroute = listOf(AI_REROUTE, SPACE_REROUTE)),
     Topic("ruimte", "Ruimte", "🪐", listOf(
         s("NASA", "https://www.nasa.gov/feed/"),
         s("Space.com", "https://www.space.com/feeds/all"),
