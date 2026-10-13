@@ -64,12 +64,17 @@ class Vm(app: Application) : AndroidViewModel(app) {
 
     /** Plaatjes van de artikelpagina (og:image) voor berichten waarvan de feed er geen heeft. */
     val ogImages = mutableStateMapOf<String, String>()
+    /** Berichten waarvoor ook de artikelpagina geen plaatje gaf: die krijgen een tegel met het logo van de bron. */
+    val ogFailed = mutableStateMapOf<String, Boolean>()
+    /** Logo per bron (uit de feeds), bewaard zodat het ook na een herstart meteen beschikbaar is. */
+    val logos = mutableStateMapOf<String, String>()
     private val ogTried = HashSet<String>()
     private val ogLimit = kotlinx.coroutines.sync.Semaphore(2)
 
     /** Haalt, als de feed geen plaatje geeft, het plaatje van de artikelpagina op. Maximaal twee tegelijk, één keer per bericht. */
     fun loadOgImage(i: Item) {
-        if (i.img != null || i.source == "Hacker News" || i.link in ogImages || !ogTried.add(i.link)) return
+        if (i.img != null || i.link in ogImages || ogFailed[i.link] == true || !ogTried.add(i.link)) return
+        if (i.source == "Hacker News") { ogFailed[i.link] = true; return }
         viewModelScope.launch {
             val url = ogLimit.withPermit {
                 withContext(Dispatchers.IO) {
@@ -81,7 +86,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
                     }.getOrNull()
                 }
             }
-            if (url != null) ogImages[i.link] = url
+            if (url != null) ogImages[i.link] = url else ogFailed[i.link] = true
         }
     }
 
@@ -126,6 +131,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
             val so = JSONObject(prefs.getString("srcOverride", "{}")!!)
             for (k in so.keys()) sourceOverride[k] = so.getBoolean(k)
         }
+        runCatching { JSONObject(prefs.getString("logos", "{}")!!).let { o -> for (k in o.keys()) logos[k] = o.getString(k) } }
         sunk = read.keys.toSet()
         frozenWeights = weights()
         hidden = votes.filterValues { it == -1 }.keys.toSet()
@@ -254,6 +260,10 @@ class Vm(app: Application) : AndroidViewModel(app) {
                 val snapshot = items
                 launch(Dispatchers.IO) { saveCache(snapshot) }
                 prefetchTop()
+                if (sourceLogos.isNotEmpty()) {
+                    logos.putAll(sourceLogos)
+                    prefs.edit().putString("logos", JSONObject(logos.toMap<String, Any>()).toString()).apply()
+                }
             }
             failed = ok == 0 && items.isEmpty()
             loading = false

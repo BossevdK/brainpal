@@ -342,6 +342,8 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
             androidx.compose.runtime.LaunchedEffect(i.link) { vm.loadOgImage(i) }
             if (img != null) {
                 NewsImage(img, i.link, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+            } else if (vm.ogFailed[i.link] == true) {
+                SourceTile(i.source, vm.logos[i.source])
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -369,6 +371,32 @@ fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
                 IconBtn(if (saved) Ic.BookmarkFilled else Ic.Bookmark, if (saved) "Verwijder uit bewaard" else "Bewaar", if (saved) cs.primary else cs.onSurfaceVariant) { vm.toggleSaved(i) }
             }
         }
+    }
+}
+
+/** Voor berichten zonder plaatje: een gekleurde tegel met het logo (of de beginletter) en de naam van de bron. De kleur hoort bij de bron. */
+@Composable
+private fun SourceTile(source: String, logo: String?) {
+    val hue = (source.hashCode().toLong().let { if (it < 0) -it else it } % 360).toFloat()
+    val dark = isSystemInDarkTheme()
+    val bg = if (dark) Color.hsv(hue, 0.45f, 0.30f) else Color.hsv(hue, 0.22f, 0.95f)
+    Row(
+        Modifier.fillMaxWidth().height(110.dp).background(bg),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center
+    ) {
+        if (logo != null) {
+            AsyncImage(
+                model = logo, contentDescription = null, contentScale = ContentScale.Fit,
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp))
+            )
+        } else {
+            Box(
+                Modifier.size(56.dp).clip(CircleShape).background(Color.hsv(hue, 0.55f, if (dark) 0.55f else 0.80f)),
+                contentAlignment = Alignment.Center
+            ) { Text(source.take(1).uppercase(), fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White) }
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(source, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

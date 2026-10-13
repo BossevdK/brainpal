@@ -283,6 +283,9 @@ private fun shorten(s: String, max: Int = 240): String {
     return if (end > 100) cut.substring(0, end + 1) else cut.replace(Regex("\\s+\\S*$"), "") + "…"
 }
 
+/** Logo per bron, uit de feed zelf (het plaatje van het kanaal). Wordt getoond bij berichten zonder eigen plaatje. */
+val sourceLogos = java.util.concurrent.ConcurrentHashMap<String, String>()
+
 fun fetchFeed(src: Source, topic: String): List<Item> {
     val (body, _) = try {
         Net.get(src.url, asBrowser = false)
@@ -292,6 +295,8 @@ fun fetchFeed(src: Source, topic: String): List<Item> {
     }
     // Sommige feeds zijn enorm (honderden berichten). We willen er maar 12, dus parseer alleen het begin: scheelt tijd en batterij.
     val doc = Jsoup.parse(if (body.length > 250_000) body.substring(0, 250_000) else body, "", Parser.xmlParser())
+    (doc.select("image > url").firstOrNull { it.parent()?.parent()?.tagName() != "item" } ?: doc.selectFirst("feed > logo, feed > icon"))
+        ?.text()?.trim()?.takeIf { it.startsWith("http") }?.let { sourceLogos[src.name] = https(it) ?: it }
     return doc.select("item, entry").mapNotNull { e ->
         val title = plain(e.selectFirst("title")?.text().orEmpty())
         val linkEl = e.select("link").firstOrNull { it.hasAttr("href") && it.attr("rel") != "self" } ?: e.selectFirst("link")
