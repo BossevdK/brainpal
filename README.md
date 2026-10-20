@@ -9,6 +9,10 @@ Het nieuws wordt op de telefoon opgehaald uit openbare RSS-feeds. Geen account e
 - Meldingen bij nieuw nieuws
 - Updates via GitHub: de app controleert of er een nieuwere release is en installeert die op verzoek
 
+## Lettertypes
+
+Bricolage Grotesque en Literata (open licentie, SIL OFL 1.1; de licentietekst staat in `app/src/main/assets`).
+
 ## Installeren
 
 Download `BrainPal.apk` bij de nieuwste [Release](../../releases/latest) en open het bestand op je telefoon.

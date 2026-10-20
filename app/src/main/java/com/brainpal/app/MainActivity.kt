@@ -120,19 +120,7 @@ class MainActivity : ComponentActivity() {
         val vm = vm // `by viewModels()` is lazy: hier afdwingen, anders ontstaat de Vm alsnog binnen setContent
         setContent {
             val dark = isSystemInDarkTheme()
-            MaterialTheme(
-                colorScheme = if (dark) darkColorScheme(
-                    primary = BrandDark, onPrimary = Color(0xFF14112E), background = Color(0xFF13121F), onBackground = Color(0xFFEFEEFF),
-                    surface = Color(0xFF1C1A2E), onSurface = Color(0xFFEFEEFF), surfaceVariant = Color(0xFF2A2745),
-                    onSurfaceVariant = Color(0xFFA9A6CC), outlineVariant = Color(0xFF2E2B4A), secondaryContainer = Color(0xFF332F5C),
-                    onSecondaryContainer = Color(0xFFEFEEFF), error = Color(0xFFFF7B7A)
-                ) else lightColorScheme(
-                    primary = Brand, onPrimary = Color.White, background = Color(0xFFF6F5FF), onBackground = Color(0xFF1D1B3A),
-                    surface = Color.White, onSurface = Color(0xFF1D1B3A), surfaceVariant = Color(0xFFEAE7FB),
-                    onSurfaceVariant = Color(0xFF66638C), outlineVariant = Color(0xFFE4E1FA), secondaryContainer = Color(0xFFE3DEFF),
-                    onSecondaryContainer = Color(0xFF1D1B3A), error = Color(0xFFD6403F)
-                )
-            ) {
+            MaterialTheme(colorScheme = if (dark) BrainDark else BrainLight, typography = BrainTypography) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { App(vm) }
             }
         }
@@ -145,7 +133,7 @@ private val ItemSaver = androidx.compose.runtime.saveable.Saver<Item?, ArrayList
 )
 
 enum class Screen(val label: String, val icon: ImageVector) {
-    Feed("Feed", Ic.Feed), Saved("Bewaard", Ic.Bookmark), Settings("Instellingen", Ic.Settings)
+    Feed("Brief", Ic.Feed), Saved("Bewaard", Ic.Bookmark), Settings("Instellingen", Ic.Settings)
 }
 
 fun ago(t: Long): String {
@@ -158,11 +146,11 @@ fun ago(t: Long): String {
 }
 
 @Composable
-private fun Ico(v: ImageVector, desc: String?, tint: Color, size: Dp = 22.dp) =
+fun Ico(v: ImageVector, desc: String?, tint: Color, size: Dp = 22.dp) =
     Icon(v, desc, Modifier.size(size), tint = tint)
 
 @Composable
-private fun IconBtn(v: ImageVector, desc: String, tint: Color = MaterialTheme.colorScheme.onSurfaceVariant, onClick: () -> Unit) =
+fun IconBtn(v: ImageVector, desc: String, tint: Color = MaterialTheme.colorScheme.onSurfaceVariant, onClick: () -> Unit) =
     IconButton(onClick = onClick) { Ico(v, desc, tint) }
 
 @Composable
@@ -235,7 +223,7 @@ private fun LocalContentColorFix(): Color = androidx.compose.material3.LocalCont
 fun Header(title: String, subtitle: String? = null, trailing: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
+            Text(title, fontSize = 31.sp, lineHeight = 31.sp, fontFamily = DisplayNarrow, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp, color = MaterialTheme.colorScheme.onBackground)
             if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         trailing()
@@ -243,63 +231,17 @@ fun Header(title: String, subtitle: String? = null, trailing: @Composable () -> 
 }
 
 @Composable
-fun FeedScreen(vm: Vm, listState: LazyListState, onUpdate: () -> Unit, open: (Item) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val list = vm.ranked
-    val cs = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Header("BrainPal", if (vm.updated > 0) "Bijgewerkt ${ago(vm.updated)} geleden" else null) {
-            IconBtn(Ic.Refresh, "Vernieuwen") { vm.refresh(only = vm.filter) }
-        }
-        if (vm.loading) LinearProgressIndicator(Modifier.fillMaxWidth().height(2.dp), color = cs.primary, trackColor = cs.outlineVariant)
-        else Spacer(Modifier.height(2.dp))
-        vm.update?.let { u ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(14.dp))
-                    .background(cs.primary).clickable(onClick = onUpdate).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Update beschikbaar: versie ${u.version}", color = cs.onPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("Bekijk", color = cs.onPrimary, fontWeight = FontWeight.Bold)
-            }
-        }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item { TopicChip("Alles", vm.filter == null) { vm.filter = null; scope.launch { listState.scrollToItem(0) } } }
-            items(vm.topics) { id -> TopicChip(topicOf(id)!!.name, vm.filter == id) { vm.filter = id; vm.refreshTopicIfStale(id); scope.launch { listState.scrollToItem(0) } } }
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                list.isEmpty() && vm.loading -> Center { CircularProgressIndicator(color = cs.primary) }
-                list.isEmpty() && vm.failed -> Center {
-                    Text("Geen verbinding", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("Het nieuws kon niet worden geladen.", color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp, bottom = 16.dp))
-                    Button(onClick = { vm.refresh() }) { Text("Opnieuw proberen") }
-                }
-                list.isEmpty() -> Center { Text("Niets gevonden voor dit filter.", color = cs.onSurfaceVariant) }
-                else -> LazyColumn(state = listState, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(list, key = { it.link }) { ArticleCard(vm, it, open) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TopicChip(label: String, selected: Boolean, onClick: () -> Unit) {
+fun TopicChip(label: String, selected: Boolean, dot: Color? = null, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     FilterChip(
-        selected = selected, onClick = onClick, label = { Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+        selected = selected, onClick = onClick, label = { Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) },
+        leadingIcon = if (dot != null) ({ Box(Modifier.size(9.dp).clip(CircleShape).background(dot)) }) else null,
         shape = RoundedCornerShape(50),
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = cs.surface, labelColor = cs.onSurface,
+            containerColor = cs.surfaceVariant, labelColor = cs.onSurface,
             selectedContainerColor = cs.primary, selectedLabelColor = cs.onPrimary
         ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true, selected = selected, borderColor = cs.outlineVariant, selectedBorderColor = cs.primary
-        )
+        border = null
     )
 }
 
@@ -307,78 +249,9 @@ private fun TopicChip(label: String, selected: Boolean, onClick: () -> Unit) {
 fun Center(content: @Composable () -> Unit) =
     Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { content() }
 
-@Composable
-fun SavedScreen(vm: Vm, listState: LazyListState, open: (Item) -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Header("Bewaard", if (vm.saved.isEmpty()) null else "${vm.saved.size} ${if (vm.saved.size == 1) "artikel" else "artikelen"}")
-        if (vm.saved.isEmpty()) {
-            Center {
-                Ico(Ic.Bookmark, null, cs.onSurfaceVariant, 40.dp)
-                Text("Nog niets bewaard", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 12.dp))
-                Text("Tik bij een artikel op het bladwijzer-icoon om het hier te bewaren.", color = cs.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-            }
-        } else {
-            LazyColumn(state = listState, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                items(vm.saved.toList(), key = { it.link }) { ArticleCard(vm, it, open) }
-            }
-        }
-    }
-}
-
-@Composable
-fun ArticleCard(vm: Vm, i: Item, open: (Item) -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    val isRead = vm.read[i.link] == true
-    val isNew = vm.prevVisit > 0 && i.date > vm.prevVisit && !isRead
-    val saved = vm.isSaved(i.link)
-    val liked = vm.votes[i.link] == 1
-    val disliked = vm.votes[i.link] == -1
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
-        border = BorderStroke(1.dp, cs.outlineVariant),
-    ) {
-        Column(Modifier.clickable { open(i) }) {
-            val img = i.img ?: vm.ogImages[i.link]
-            androidx.compose.runtime.LaunchedEffect(i.link) { vm.loadOgImage(i) }
-            if (img != null) {
-                NewsImage(img, i.link, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-            } else if (vm.ogFailed[i.link] == true) {
-                SourceTile(i.source, vm.logos[i.source])
-            }
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isNew) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(Orange))
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    Text(topicOf(vm.displayTopic(i))?.name ?: i.topic, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = cs.primary)
-                    Text("  ·  ${i.source}  ·  ${ago(i.date)}", fontSize = 12.sp, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    i.title, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 4, overflow = TextOverflow.Ellipsis,
-                    color = if (isRead || disliked) cs.onSurfaceVariant else cs.onSurface
-                )
-                if (i.summary.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(i.summary, fontSize = 14.sp, lineHeight = 20.sp, color = cs.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconBtn(if (liked) Ic.ThumbUpFilled else Ic.ThumbUp, "Meer hiervan", if (liked) cs.primary else cs.onSurfaceVariant) { vm.vote(i, true) }
-                IconBtn(if (disliked) Ic.ThumbDownFilled else Ic.ThumbDown, "Minder hiervan", if (disliked) cs.primary else cs.onSurfaceVariant) { vm.vote(i, false) }
-                Spacer(Modifier.weight(1f))
-                IconBtn(if (saved) Ic.BookmarkFilled else Ic.Bookmark, if (saved) "Verwijder uit bewaard" else "Bewaar", if (saved) cs.primary else cs.onSurfaceVariant) { vm.toggleSaved(i) }
-            }
-        }
-    }
-}
-
 /** Voor berichten zonder plaatje: een gekleurde tegel met het logo (of de beginletter) en de naam van de bron. De kleur hoort bij de bron. */
 @Composable
-private fun SourceTile(source: String, logo: String?) {
+fun SourceTile(source: String, logo: String?) {
     val hue = (source.hashCode().toLong().let { if (it < 0) -it else it } % 360).toFloat()
     val dark = isSystemInDarkTheme()
     val bg = if (dark) Color.hsv(hue, 0.45f, 0.30f) else Color.hsv(hue, 0.22f, 0.95f)
@@ -418,7 +291,7 @@ private fun SwitchRow(title: String, desc: String, checked: Boolean, onChange: (
             Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Text(desc, fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = onChange, colors = appSwitchColors())
     }
 }
 
@@ -453,19 +326,7 @@ fun SettingsScreen(vm: Vm, done: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     TOPICS.forEach { t ->
-                        FilterChip(
-                            selected = t.id in sel,
-                            onClick = { if (t.id in sel) sel.remove(t.id) else sel.add(t.id) },
-                            label = { Text("${t.emoji}  ${t.name}", fontSize = 14.sp) },
-                            shape = RoundedCornerShape(50),
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = cs.surface, labelColor = cs.onSurface,
-                                selectedContainerColor = cs.primary, selectedLabelColor = cs.onPrimary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true, selected = t.id in sel, borderColor = cs.outlineVariant, selectedBorderColor = cs.primary
-                            )
-                        )
+                        TopicChip(t.name, t.id in sel, topicColor(t.id, isSystemInDarkTheme())) { if (t.id in sel) sel.remove(t.id) else sel.add(t.id) }
                     }
                 }
                 if (first || changed) {
@@ -525,7 +386,7 @@ fun SettingsScreen(vm: Vm, done: () -> Unit) {
                         if (open) t.sources.forEach { s ->
                             Row(Modifier.fillMaxWidth().padding(start = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(s.name, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                                Switch(checked = vm.sourceOn(t, s), onCheckedChange = { vm.setSource(t, s, it) })
+                                Switch(checked = vm.sourceOn(t, s), onCheckedChange = { vm.setSource(t, s, it) }, colors = appSwitchColors())
                             }
                         }
                     }
@@ -560,7 +421,7 @@ fun SettingsScreen(vm: Vm, done: () -> Unit) {
             }
             item {
                 Text(
-                    "👍 en 👎 bij artikelen leren BrainPal wat je leuk vindt. Je gegevens blijven op deze telefoon.",
+                    "Veeg een bericht naar rechts om het te bewaren en naar links voor minder hiervan. Wat je 👍 of 👎 geeft leert BrainPal wat je leuk vindt. Je gegevens blijven op deze telefoon.",
                     fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)
                 )
             }
@@ -633,11 +494,15 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
     }
     val article = res?.getOrNull()
     val saved = vm.isSaved(item.link)
+    val liked = vm.votes[item.link] == 1
+    val disliked = vm.votes[item.link] == -1
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBtn(Ic.Back, "Terug", cs.onSurface) { close() }
             Text(item.source, color = cs.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            IconBtn(if (saved) Ic.BookmarkFilled else Ic.Bookmark, if (saved) "Verwijder uit bewaard" else "Bewaar", if (saved) cs.primary else cs.onSurfaceVariant) { vm.toggleSaved(item) }
+            IconBtn(if (liked) Ic.ThumbUpFilled else Ic.ThumbUp, "Meer hiervan", if (liked) cs.onSurface else cs.onSurfaceVariant) { vm.vote(item, true) }
+            IconBtn(if (disliked) Ic.ThumbDownFilled else Ic.ThumbDown, "Minder hiervan", if (disliked) cs.onSurface else cs.onSurfaceVariant) { vm.vote(item, false) }
+            IconBtn(if (saved) Ic.BookmarkFilled else Ic.Bookmark, if (saved) "Verwijder uit bewaard" else "Bewaar", if (saved) cs.onSurface else cs.onSurfaceVariant) { vm.toggleSaved(item) }
             IconBtn(Ic.External, "Open op de website") { uri.openUri(item.link) }
         }
         if (auto == 1 && gate) AutoConsent(item.link) { ok ->
@@ -648,13 +513,20 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 40.dp)) {
             item {
-                Text(topicOf(vm.displayTopic(item))?.name?.uppercase() ?: "", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = cs.primary, letterSpacing = 1.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(topicColor(vm.displayTopic(item), isSystemInDarkTheme())))
+                    Spacer(Modifier.width(8.dp))
+                    Text(topicOf(vm.displayTopic(item))?.name ?: "", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
                 Text(
                     article?.title?.takeIf { it.isNotBlank() } ?: item.title,
-                    fontSize = 26.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif,
-                    modifier = Modifier.padding(top = 6.dp)
+                    fontSize = 31.sp, lineHeight = 34.sp, fontWeight = FontWeight.ExtraBold, fontFamily = DisplayNarrow, letterSpacing = (-0.4).sp,
+                    modifier = Modifier.padding(top = 10.dp)
                 )
-                Text("${item.source}  ·  ${ago(item.date)} geleden", fontSize = 13.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 16.dp)) {
+                    Text(item.source, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(readerTime(item.date), fontSize = 13.sp, color = cs.onSurfaceVariant)
+                }
             }
             when {
                 res == null || (gate && auto == 1) -> item {
@@ -665,7 +537,7 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
                             Spacer(Modifier.height(20.dp))
                         }
                         if (item.summary.isNotEmpty()) {
-                            Text(item.summary, fontSize = 18.sp, lineHeight = 29.sp, fontFamily = FontFamily.Serif, color = cs.onSurfaceVariant)
+                            Text(item.summary, fontSize = 18.sp, lineHeight = 29.sp, fontFamily = Read, color = cs.onSurfaceVariant)
                         }
                     }
                     Column(Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -717,7 +589,7 @@ fun Reader(vm: Vm, item: Item, close: () -> Unit) {
                         when (b.type) {
                             "h" -> Text(b.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
                             else -> Text(
-                                (if (b.type == "li") "•  " else "") + b.text, fontSize = 18.sp, lineHeight = 29.sp, fontFamily = FontFamily.Serif,
+                                (if (b.type == "li") "•  " else "") + b.text, fontSize = 18.sp, lineHeight = 29.sp, fontFamily = Read,
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                         }

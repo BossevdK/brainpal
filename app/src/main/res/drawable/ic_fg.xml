@@ -3,12 +3,12 @@
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <!-- hersenen: twee ronde helften met een middenlijn -->
-    <path android:fillColor="#FFFFFF"
+    <path android:fillColor="#FF7A9A"
         android:pathData="M54,30 C46,24 34,27 32,37 C25,39 24,49 29,53 C25,59 29,69 38,69 C41,76 50,77 54,72 Z" />
-    <path android:fillColor="#FFFFFF"
+    <path android:fillColor="#FF7A9A"
         android:pathData="M54,30 C62,24 74,27 76,37 C83,39 84,49 79,53 C83,59 79,69 70,69 C67,76 58,77 54,72 Z" />
-    <path android:strokeColor="#5B4BDB" android:strokeWidth="2.5" android:strokeLineCap="round"
+    <path android:strokeColor="#16213E" android:strokeWidth="2.5" android:strokeLineCap="round"
         android:pathData="M54,32 L54,70" />
-    <path android:strokeColor="#5B4BDB" android:strokeWidth="2.5" android:strokeLineCap="round"
+    <path android:strokeColor="#16213E" android:strokeWidth="2.5" android:strokeLineCap="round"
         android:pathData="M38,44 C42,46 46,45 49,42 M70,44 C66,46 62,45 59,42 M38,58 C43,56 47,58 50,61 M70,58 C65,56 61,58 58,61" />
 </vector>

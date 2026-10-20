@@ -13,8 +13,8 @@ android {
         applicationId = "com.brainpal.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "1.18"
+        versionCode = 20
+        versionName = "1.19"
     }
     // Eigen sleutel (staat in keystore.properties, die niet in git komt). Zonder dat bestand valt release terug op de testsleutel.
     val ksProps = Properties().apply {

@@ -3,6 +3,6 @@
     <style name="Theme.BrainPal" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/bp_bg</item>
     </style>
-    <color name="bp_bg">#F6F5FF</color>
-    <color name="ic_bg">#5B4BDB</color>
+    <color name="bp_bg">#F2F4F8</color>
+    <color name="ic_bg">#16213E</color>
 </resources>
