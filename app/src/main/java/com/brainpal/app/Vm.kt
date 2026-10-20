@@ -30,6 +30,7 @@ class Vm(app: Application) : AndroidViewModel(app) {
     var failed by mutableStateOf(false)
     var updated by mutableStateOf(0L)
     var notify by mutableStateOf(prefs.getBoolean("notify", false))
+    var notifyMode by mutableStateOf(prefs.getString("notifyMode", "daily")!!) // "daily" of "often"
     var autoCookies by mutableStateOf(prefs.getBoolean("autoCookies", false))
 
     val votes = mutableStateMapOf<String, Int>()
@@ -139,6 +140,11 @@ class Vm(app: Application) : AndroidViewModel(app) {
         if (notify) scheduleNews(app)
         refreshIfStale()
         runCatching { java.io.File(app.cacheDir, "updates").deleteRecursively() } // oude gedownloade updates opruimen
+    }
+
+    fun chooseNotifyMode(mode: String) {
+        notifyMode = mode
+        prefs.edit().putString("notifyMode", mode).apply()
     }
 
     fun switchNotify(on: Boolean) {

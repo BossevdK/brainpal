@@ -480,12 +480,24 @@ fun SettingsScreen(vm: Vm, done: () -> Unit) {
         if (!first) {
             item {
                 SectionCard {
-                    SwitchRow("Meldingen", "Een melding bij nieuw nieuws in je onderwerpen. Niet tussen 22:00 en 08:00.", vm.notify) { on ->
+                    SwitchRow("Meldingen", "Een melding met de beste nieuwe berichten voor jou, nooit tussen 22:00 en 08:00.", vm.notify) { on ->
                         if (!on) vm.switchNotify(false)
                         else if (Build.VERSION.SDK_INT >= 33 &&
                             ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                         ) permission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         else vm.switchNotify(true)
+                    }
+                    if (vm.notify) {
+                        Spacer(Modifier.height(10.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TopicChip("Eén keer per dag", vm.notifyMode == "daily") { vm.chooseNotifyMode("daily") }
+                            TopicChip("Een paar keer per dag", vm.notifyMode == "often") { vm.chooseNotifyMode("often") }
+                        }
+                        Text(
+                            if (vm.notifyMode == "daily") "Eén melding per dag met de 5 beste nieuwe berichten, bij de eerste kans na 08:00."
+                            else "Hooguit één melding per 3 uur, alleen als er minstens 2 nieuwe berichten zijn die bij jou passen.",
+                            fontSize = 13.sp, lineHeight = 18.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                     HorizontalDivider(Modifier.padding(vertical = 14.dp), color = cs.outlineVariant)
                     SwitchRow(
