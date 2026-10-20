@@ -39,16 +39,21 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -212,12 +217,23 @@ private fun SwipeRow(vm: Vm, i: Item, corner: androidx.compose.ui.unit.Dp, conte
 private fun TitleText(i: Item, isNew: Boolean, dim: Boolean, size: TextUnit, line: TextUnit, weight: FontWeight, maxLines: Int, spacing: TextUnit = 0.sp) {
     val cs = MaterialTheme.colorScheme
     val marker = if (isSystemInDarkTheme()) MarkerDark else MarkerLight
-    val text = buildAnnotatedString {
-        if (isNew) withStyle(SpanStyle(background = marker)) { append(i.title) } else append(i.title)
-    }
+    // Nieuw: een gele markeerstift onder de onderste helft van elke regel (geen vol vlak achter de letters).
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val highlight = if (isNew) Modifier.drawBehind {
+        val l = layout ?: return@drawBehind
+        val corner = CornerRadius(3.dp.toPx())
+        for (n in 0 until l.lineCount) {
+            val top = l.getLineTop(n)
+            val h = l.getLineBottom(n) - top
+            val left = l.getLineLeft(n)
+            drawRoundRect(marker, Offset(left - 2.dp.toPx(), top + h * 0.58f), Size(l.getLineRight(n) - left + 4.dp.toPx(), h * 0.34f), corner)
+        }
+    } else Modifier
     Text(
-        text, fontSize = size, lineHeight = line, fontWeight = weight, letterSpacing = spacing, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
-        color = if (dim) cs.onSurfaceVariant else cs.onSurface
+        i.title, fontSize = size, lineHeight = line, fontWeight = weight, letterSpacing = spacing, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+        color = if (dim) cs.onSurfaceVariant else cs.onSurface,
+        onTextLayout = { layout = it },
+        modifier = highlight
     )
 }
 
